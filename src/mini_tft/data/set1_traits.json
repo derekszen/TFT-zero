@@ -1,0 +1,22 @@
+{
+  "assassin": {"breakpoints": {"3": {"carry_multiplier": 1.18}, "6": {"carry_multiplier": 1.40}}},
+  "blademaster": {"breakpoints": {"3": {"carry_multiplier": 1.16}, "6": {"carry_multiplier": 1.36}}},
+  "brawler": {"breakpoints": {"2": {"tank_multiplier": 1.14}, "4": {"tank_multiplier": 1.32}}},
+  "demon": {"breakpoints": {"2": {"enemy_power_penalty": 5.0}, "4": {"enemy_power_penalty": 13.0}}},
+  "dragon": {"breakpoints": {"2": {"flat_power": 10.0}}},
+  "elemental": {"breakpoints": {"1": {"flat_power": 4.0}, "3": {"flat_power": 14.0}}},
+  "exile": {"breakpoints": {"1": {"flat_power": 6.0}}},
+  "glacial": {"breakpoints": {"2": {"enemy_power_penalty": 6.0}, "4": {"enemy_power_penalty": 15.0}}},
+  "guardian": {"breakpoints": {"2": {"tank_multiplier": 1.20}}},
+  "gunslinger": {"breakpoints": {"2": {"carry_multiplier": 1.14}, "4": {"carry_multiplier": 1.30}}},
+  "imperial": {"breakpoints": {"2": {"carry_multiplier": 1.16}, "4": {"carry_multiplier": 1.38}}},
+  "knight": {"breakpoints": {"2": {"tank_multiplier": 1.12}, "4": {"tank_multiplier": 1.28}, "6": {"tank_multiplier": 1.48}}},
+  "noble": {"breakpoints": {"3": {"flat_power": 8.0}, "6": {"flat_power": 24.0}}},
+  "pirate": {"breakpoints": {"1": {"flat_power": 2.0}, "3": {"flat_power": 8.0}}},
+  "ranger": {"breakpoints": {"2": {"carry_multiplier": 1.15}, "4": {"carry_multiplier": 1.35}}},
+  "robot": {"breakpoints": {"1": {"support_multiplier": 1.10}}},
+  "shapeshifter": {"breakpoints": {"2": {"carry_multiplier": 1.10, "tank_multiplier": 1.10}, "4": {"carry_multiplier": 1.22, "tank_multiplier": 1.22}}},
+  "sorcerer": {"breakpoints": {"3": {"carry_multiplier": 1.14, "support_multiplier": 1.14}, "6": {"carry_multiplier": 1.34, "support_multiplier": 1.34}}},
+  "void": {"breakpoints": {"3": {"enemy_power_penalty": 12.0}}},
+  "wild": {"breakpoints": {"2": {"carry_multiplier": 1.12}, "4": {"carry_multiplier": 1.30}}}
+}

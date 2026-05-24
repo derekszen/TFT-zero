@@ -1,0 +1,154 @@
+{
+  "items": {},
+  "source": {
+    "champion_data_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/data/en_US/champion.json",
+    "name": "Riot Data Dragon",
+    "version": "9.19.1"
+  },
+  "units": {
+    "1": {
+      "name": "Garen",
+      "path": "assets/units/garen.png",
+      "source_file": "Garen.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Garen.png"
+    },
+    "10": {
+      "name": "Blitzcrank",
+      "path": "assets/units/blitzcrank.png",
+      "source_file": "Blitzcrank.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Blitzcrank.png"
+    },
+    "11": {
+      "name": "Pyke",
+      "path": "assets/units/pyke.png",
+      "source_file": "Pyke.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Pyke.png"
+    },
+    "12": {
+      "name": "Braum",
+      "path": "assets/units/braum.png",
+      "source_file": "Braum.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Braum.png"
+    },
+    "13": {
+      "name": "Ashe",
+      "path": "assets/units/ashe.png",
+      "source_file": "Ashe.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Ashe.png"
+    },
+    "14": {
+      "name": "Katarina",
+      "path": "assets/units/katarina.png",
+      "source_file": "Katarina.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Katarina.png"
+    },
+    "15": {
+      "name": "Shyvana",
+      "path": "assets/units/shyvana.png",
+      "source_file": "Shyvana.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Shyvana.png"
+    },
+    "16": {
+      "name": "Morgana",
+      "path": "assets/units/morgana.png",
+      "source_file": "Morgana.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Morgana.png"
+    },
+    "17": {
+      "name": "Volibear",
+      "path": "assets/units/volibear.png",
+      "source_file": "Volibear.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Volibear.png"
+    },
+    "18": {
+      "name": "Draven",
+      "path": "assets/units/draven.png",
+      "source_file": "Draven.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Draven.png"
+    },
+    "19": {
+      "name": "Brand",
+      "path": "assets/units/brand.png",
+      "source_file": "Brand.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Brand.png"
+    },
+    "2": {
+      "name": "Vayne",
+      "path": "assets/units/vayne.png",
+      "source_file": "Vayne.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Vayne.png"
+    },
+    "20": {
+      "name": "Sejuani",
+      "path": "assets/units/sejuani.png",
+      "source_file": "Sejuani.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Sejuani.png"
+    },
+    "21": {
+      "name": "ChoGath",
+      "path": "assets/units/chogath.png",
+      "source_file": "Chogath.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Chogath.png"
+    },
+    "22": {
+      "name": "Leona",
+      "path": "assets/units/leona.png",
+      "source_file": "Leona.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Leona.png"
+    },
+    "23": {
+      "name": "Yasuo",
+      "path": "assets/units/yasuo.png",
+      "source_file": "Yasuo.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Yasuo.png"
+    },
+    "24": {
+      "name": "Kayle",
+      "path": "assets/units/kayle.png",
+      "source_file": "Kayle.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Kayle.png"
+    },
+    "3": {
+      "name": "Warwick",
+      "path": "assets/units/warwick.png",
+      "source_file": "Warwick.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Warwick.png"
+    },
+    "4": {
+      "name": "Nidalee",
+      "path": "assets/units/nidalee.png",
+      "source_file": "Nidalee.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Nidalee.png"
+    },
+    "5": {
+      "name": "Darius",
+      "path": "assets/units/darius.png",
+      "source_file": "Darius.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Darius.png"
+    },
+    "6": {
+      "name": "Kassadin",
+      "path": "assets/units/kassadin.png",
+      "source_file": "Kassadin.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Kassadin.png"
+    },
+    "7": {
+      "name": "Lucian",
+      "path": "assets/units/lucian.png",
+      "source_file": "Lucian.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Lucian.png"
+    },
+    "8": {
+      "name": "Varus",
+      "path": "assets/units/varus.png",
+      "source_file": "Varus.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Varus.png"
+    },
+    "9": {
+      "name": "Ahri",
+      "path": "assets/units/ahri.png",
+      "source_file": "Ahri.png",
+      "source_url": "https://ddragon.leagueoflegends.com/cdn/9.19.1/img/champion/Ahri.png"
+    }
+  }
+}

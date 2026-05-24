@@ -1,0 +1,12 @@
+[
+  {"id": 1, "name": "Rageblade", "tags": ["carry"], "effects": {"carry_multiplier": 1.20, "flat_power": 2.0}},
+  {"id": 2, "name": "Infinity Edge", "tags": ["carry"], "effects": {"carry_multiplier": 1.22, "flat_power": 1.0}},
+  {"id": 3, "name": "Rapid Firecannon", "tags": ["carry"], "effects": {"carry_multiplier": 1.16, "flat_power": 3.0}},
+  {"id": 4, "name": "Spear of Shojin", "tags": ["support"], "effects": {"support_multiplier": 1.22, "flat_power": 2.0}},
+  {"id": 5, "name": "Morellonomicon", "tags": ["support"], "effects": {"enemy_power_penalty": 6.0, "flat_power": 2.0}},
+  {"id": 6, "name": "Warmogs", "tags": ["tank"], "effects": {"tank_multiplier": 1.25, "flat_power": 3.0}},
+  {"id": 7, "name": "Dragon Claw", "tags": ["tank"], "effects": {"tank_multiplier": 1.20, "flat_power": 2.0}},
+  {"id": 8, "name": "Thornmail", "tags": ["tank"], "effects": {"tank_multiplier": 1.16, "enemy_power_penalty": 4.0}},
+  {"id": 9, "name": "Guardian Angel", "tags": ["carry", "tank"], "effects": {"flat_power": 6.0}},
+  {"id": 10, "name": "Zephyr", "tags": ["support"], "effects": {"enemy_power_penalty": 8.0}}
+]

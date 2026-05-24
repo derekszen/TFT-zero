@@ -1,0 +1,54 @@
+from __future__ import annotations
+
+import numpy as np
+
+from mini_tft import EnvConfig, MiniTFTEnv
+from mini_tft.core.actions import NUM_ACTIONS, Action
+from mini_tft.core.state import state_signature
+
+
+def test_env_reset_and_end_turn_step() -> None:
+    env = MiniTFTEnv(EnvConfig(seed=7))
+
+    obs, info = env.reset(seed=7)
+
+    assert env.observation_space.contains(obs)
+    assert info["action_mask"].dtype == np.bool_
+    assert info["action_mask"].shape == (NUM_ACTIONS,)
+    assert info["action_mask"][Action.END_TURN]
+
+    next_obs, reward, terminated, truncated, next_info = env.step(Action.END_TURN)
+
+    assert env.observation_space.contains(next_obs)
+    assert isinstance(reward, float)
+    assert not terminated
+    assert not truncated
+    assert next_info["legal_action"] is True
+
+
+def test_same_seed_and_actions_are_deterministic() -> None:
+    actions = [Action.END_TURN, Action.END_TURN, Action.END_TURN, Action.END_TURN]
+
+    signatures = []
+    for _ in range(2):
+        env = MiniTFTEnv(EnvConfig(seed=42))
+        env.reset(seed=42)
+        for action in actions:
+            env.step(action)
+        assert env.state is not None
+        signatures.append(state_signature(env.state))
+
+    assert signatures[0] == signatures[1]
+
+
+def test_episode_terminates_at_max_round() -> None:
+    env = MiniTFTEnv(EnvConfig(seed=3, max_round=2))
+    env.reset(seed=3)
+
+    terminated = truncated = False
+    while not (terminated or truncated):
+        _, _, terminated, truncated, _ = env.step(Action.END_TURN)
+
+    assert terminated
+    assert env.state is not None
+    assert env.state.final_reason in {"hp_zero", "max_round"}
