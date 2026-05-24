@@ -29,13 +29,15 @@ from mini_tft.core.config import EnvConfig
 from mini_tft.rl.dataset import load_dataset
 from mini_tft.rl.evaluate_policy import evaluate_bot
 from mini_tft.rl.gym_env import MiniTFTGymEnv
-from mini_tft.tools.generate_bot_dataset import generate_dataset
+from mini_tft.tools.generate_bot_dataset import generate_dataset, generate_dataset_parallel
 
 
 @dataclass(frozen=True)
 class SmokeConfig:
     benchmark_episodes: int = 100
     dataset_episodes: int = 100
+    parallel_dataset_episodes: int = 100
+    parallel_workers: int | None = 0
     eval_episodes: int = 10
     trace_steps: int = 8
     seed: int = 0
@@ -53,6 +55,8 @@ def run_smoke(config: SmokeConfig) -> dict[str, Any]:
         "config": {
             "benchmark_episodes": config.benchmark_episodes,
             "dataset_episodes": config.dataset_episodes,
+            "parallel_dataset_episodes": config.parallel_dataset_episodes,
+            "parallel_workers": config.parallel_workers,
             "eval_episodes": config.eval_episodes,
             "trace_steps": config.trace_steps,
             "run_checks": config.run_checks,
@@ -60,6 +64,7 @@ def run_smoke(config: SmokeConfig) -> dict[str, Any]:
         "checks": [],
         "benchmark": {},
         "dataset": {},
+        "parallel_dataset": {},
         "evaluation": {},
         "trace": [],
         "failures": [],
@@ -84,6 +89,13 @@ def run_smoke(config: SmokeConfig) -> dict[str, Any]:
         report["failures"].append("dataset episode count mismatch")
     if dataset["done_count"] != config.dataset_episodes:
         report["failures"].append("dataset done count mismatch")
+
+    parallel_dataset = _run_parallel_dataset(config)
+    report["parallel_dataset"] = parallel_dataset
+    if parallel_dataset["episodes"] != config.parallel_dataset_episodes:
+        report["failures"].append("parallel dataset episode count mismatch")
+    if parallel_dataset["done_count"] != config.parallel_dataset_episodes:
+        report["failures"].append("parallel dataset done count mismatch")
 
     report["evaluation"] = _run_evaluation(config.eval_episodes)
     report["trace"] = _run_trace(config.seed, config.trace_steps)
@@ -111,6 +123,7 @@ def format_markdown(report: dict[str, Any]) -> str:
     ]
     checks_ok = all(check["ok"] for check in report["checks"]) if report["checks"] else True
     dataset = report["dataset"]
+    parallel_dataset = report["parallel_dataset"]
     benchmark = report["benchmark"]
     evaluation = report["evaluation"]
     lines.extend(
@@ -125,6 +138,13 @@ def format_markdown(report: dict[str, Any]) -> str:
                 f"| Dataset | `{_status(dataset['done_count'] == dataset['episodes'])}` | "
                 f"{dataset['episodes']} episodes, {dataset['transitions']} transitions, "
                 f"{dataset['transitions_per_sec']:.1f} transitions/sec |"
+            ),
+            (
+                "| Parallel Dataset | "
+                f"`{_status(parallel_dataset['done_count'] == parallel_dataset['episodes'])}` | "
+                f"{parallel_dataset['episodes']} episodes, {parallel_dataset['transitions']} "
+                f"transitions, {parallel_dataset['workers']} workers, "
+                f"{parallel_dataset['transitions_per_sec']:.1f} transitions/sec |"
             ),
             (
                 f"| Evaluation | `{_status(bool(evaluation))}` | "
@@ -165,6 +185,12 @@ def format_markdown(report: dict[str, Any]) -> str:
             f"| Dataset seconds | {dataset['elapsed_sec']:.3f} |",
             f"| Dataset transitions/sec | {dataset['transitions_per_sec']:.1f} |",
             f"| Dataset file MB | {dataset['file_mb']:.3f} |",
+            f"| Parallel dataset episodes | {parallel_dataset['episodes']} |",
+            f"| Parallel dataset transitions | {parallel_dataset['transitions']} |",
+            f"| Parallel dataset workers | {parallel_dataset['workers']} |",
+            f"| Parallel dataset seconds | {parallel_dataset['elapsed_sec']:.3f} |",
+            f"| Parallel dataset transitions/sec | {parallel_dataset['transitions_per_sec']:.1f} |",
+            f"| Parallel dataset file MB | {parallel_dataset['file_mb']:.3f} |",
             "",
             "## Dataset Shape",
             "",
@@ -174,6 +200,9 @@ def format_markdown(report: dict[str, Any]) -> str:
             f"| masks | `{tuple(dataset['mask_shape'])}` |",
             f"| actions | `({dataset['transitions']},)` |",
             f"| dones | `{dataset['done_count']} done rows` |",
+            f"| parallel obs | `{tuple(parallel_dataset['obs_shape'])}` |",
+            f"| parallel masks | `{tuple(parallel_dataset['mask_shape'])}` |",
+            f"| parallel dones | `{parallel_dataset['done_count']} done rows` |",
             "",
             "## Bot Evaluation",
             "",
@@ -215,6 +244,7 @@ def format_markdown(report: dict[str, Any]) -> str:
             "",
             "- `steps/sec` is bot-driven Python env throughput, not vectorized rollout throughput.",
             "- `transitions/sec` includes dataset generation and compressed `.npz` write time.",
+            "- Parallel rollout auto workers use logical CPUs capped at 32.",
             "- `trace` is a compact action/state preview for coding-agent debugging.",
         ]
     )
@@ -282,6 +312,25 @@ def _run_dataset(config: SmokeConfig) -> dict[str, Any]:
         "done_count": int(dataset.dones.sum()),
         "mean_return": float(first_returns.mean()) if len(first_returns) else 0.0,
     }
+
+
+def _run_parallel_dataset(config: SmokeConfig) -> dict[str, Any]:
+    output = Path(tempfile.gettempdir()) / "tft_zero_sim_smoke_parallel_dataset.npz"
+    metrics = generate_dataset_parallel(
+        episodes=config.parallel_dataset_episodes,
+        output=output,
+        seed=config.seed,
+        workers=config.parallel_workers,
+    )
+    dataset = load_dataset(output)
+    metrics.update(
+        {
+            "obs_shape": list(dataset.obs.shape),
+            "mask_shape": list(dataset.masks.shape),
+            "done_count": int(dataset.dones.sum()),
+        }
+    )
+    return metrics
 
 
 def _run_evaluation(episodes: int) -> dict[str, dict[str, float]]:
@@ -371,6 +420,13 @@ def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--benchmark-episodes", type=int, default=100)
     parser.add_argument("--dataset-episodes", type=int, default=100)
+    parser.add_argument("--parallel-dataset-episodes", type=int, default=100)
+    parser.add_argument(
+        "--parallel-workers",
+        type=int,
+        default=0,
+        help="Parallel dataset workers. Use 0 for hardware-aware auto.",
+    )
     parser.add_argument("--eval-episodes", type=int, default=10)
     parser.add_argument("--trace-steps", type=int, default=8)
     parser.add_argument("--seed", type=int, default=0)
@@ -383,6 +439,8 @@ def main(argv: Iterable[str] | None = None) -> int:
         SmokeConfig(
             benchmark_episodes=args.benchmark_episodes,
             dataset_episodes=args.dataset_episodes,
+            parallel_dataset_episodes=args.parallel_dataset_episodes,
+            parallel_workers=args.parallel_workers,
             eval_episodes=args.eval_episodes,
             trace_steps=args.trace_steps,
             seed=args.seed,

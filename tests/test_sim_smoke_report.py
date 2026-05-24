@@ -8,6 +8,8 @@ def test_sim_smoke_report_has_agent_friendly_sections() -> None:
         SmokeConfig(
             benchmark_episodes=1,
             dataset_episodes=1,
+            parallel_dataset_episodes=1,
+            parallel_workers=1,
             eval_episodes=1,
             trace_steps=2,
             seed=0,
@@ -23,4 +25,5 @@ def test_sim_smoke_report_has_agent_friendly_sections() -> None:
     assert "## Bot Evaluation" in markdown
     assert "## Trace Preview" in markdown
     assert report["dataset"]["transitions"] > 0
+    assert report["parallel_dataset"]["transitions"] > 0
     assert report["benchmark"]["steps"] > 0
