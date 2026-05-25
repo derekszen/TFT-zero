@@ -525,6 +525,12 @@ button:disabled {
   background: linear-gradient(180deg, rgba(83, 64, 22, 0.96), rgba(24, 17, 10, 0.96));
 }
 
+.action-panel button.active-toggle {
+  border-color: rgba(95, 203, 156, 0.86);
+  background: linear-gradient(180deg, rgba(28, 72, 57, 0.96), rgba(8, 23, 21, 0.96));
+  color: #d5ffe6;
+}
+
 .trace-panel {
   position: absolute;
   z-index: 3;

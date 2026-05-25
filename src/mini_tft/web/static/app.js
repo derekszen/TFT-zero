@@ -11,6 +11,7 @@ const ACTION = {
 const COST_NAMES = ["", "one", "two", "three", "four", "five"];
 let state = null;
 let autoplay = null;
+let stepMode = true;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -29,6 +30,7 @@ async function loadState() {
 }
 
 async function postAction(action) {
+  stopAutoplay();
   state = await api("/api/action", {
     method: "POST",
     body: JSON.stringify({ action }),
@@ -45,6 +47,7 @@ async function botStep() {
 }
 
 async function reset() {
+  stopAutoplay();
   const seed = state?.seed ?? 0;
   state = await api("/api/reset", {
     method: "POST",
@@ -230,6 +233,7 @@ function bindActionButtons() {
   setButton("slamItem", ACTION.SLAM_BEST_ITEM);
   setButton("endTurn", ACTION.END_TURN);
   document.getElementById("botStep").disabled = state.status.done;
+  renderPlayControls();
 }
 
 function setButton(id, action) {
@@ -267,12 +271,16 @@ function stopAutoplay() {
     clearInterval(autoplay);
     autoplay = null;
   }
-  document.getElementById("autoPlay").textContent = "Play";
+  renderPlayControls();
 }
 
 function toggleAutoplay() {
   if (autoplay) {
     stopAutoplay();
+    return;
+  }
+  if (stepMode) {
+    botStep().catch((error) => console.error(error));
     return;
   }
   document.getElementById("autoPlay").textContent = "Pause";
@@ -284,7 +292,35 @@ function toggleAutoplay() {
   }, 700);
 }
 
-document.getElementById("botStep").addEventListener("click", () => botStep());
+function toggleStepMode() {
+  stepMode = !stepMode;
+  if (stepMode) {
+    stopAutoplay();
+  }
+  renderPlayControls();
+}
+
+function renderPlayControls() {
+  const playButton = document.getElementById("autoPlay");
+  const modeButton = document.getElementById("stepMode");
+  if (!playButton || !modeButton || !state) return;
+
+  modeButton.textContent = stepMode ? "Step: On" : "Step: Off";
+  modeButton.classList.toggle("active-toggle", stepMode);
+  modeButton.setAttribute("aria-pressed", String(stepMode));
+  playButton.disabled = state.status.done;
+  if (autoplay) {
+    playButton.textContent = "Pause";
+  } else {
+    playButton.textContent = stepMode ? "Next Bot" : "Auto Play";
+  }
+}
+
+document.getElementById("botStep").addEventListener("click", () => {
+  stopAutoplay();
+  botStep();
+});
+document.getElementById("stepMode").addEventListener("click", toggleStepMode);
 document.getElementById("autoPlay").addEventListener("click", toggleAutoplay);
 document.getElementById("reset").addEventListener("click", () => {
   stopAutoplay();
