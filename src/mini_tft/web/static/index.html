@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MiniTFT</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="traits-panel" aria-label="Traits">
+        <div class="panel-title">Traits</div>
+        <div id="traits" class="traits-list"></div>
+      </aside>
+
+      <section class="playfield" aria-label="Arena">
+        <header class="top-hud">
+          <div class="stage-pill">
+            <span id="stage">Stage 1-1</span>
+            <span id="phase">Planning</span>
+          </div>
+          <div class="timer-ring" id="timer">30</div>
+          <div class="board-capacity" id="capacity">0 / 3</div>
+        </header>
+
+        <div class="arena">
+          <div class="enemy-lane">
+            <div class="enemy-gate">Scripted Enemy</div>
+          </div>
+          <div id="board" class="board-grid"></div>
+          <div id="bench" class="bench-row"></div>
+        </div>
+      </section>
+
+      <aside class="lobby-panel" aria-label="Lobby">
+        <div class="player-card active">
+          <div class="avatar">M</div>
+          <div>
+            <div class="player-name">MiniTFT</div>
+            <div id="hpText" class="player-hp">100 HP</div>
+          </div>
+        </div>
+        <div id="scoreboard" class="scoreboard"></div>
+      </aside>
+
+      <section class="bottom-bar" aria-label="Shop">
+        <div class="economy-panel">
+          <div class="level-box">
+            <span id="level">Lv. 3</span>
+            <strong id="xp">0/6</strong>
+          </div>
+          <button id="buyXp" class="shop-button" type="button">Buy XP</button>
+          <button id="roll" class="shop-button" type="button">Refresh</button>
+        </div>
+
+        <div class="center-economy">
+          <div class="gold-bank"><span id="gold">0</span></div>
+          <div class="combat-readout">
+            <span id="strength">0.0</span>
+            <span id="enemyNext">0.0</span>
+          </div>
+        </div>
+
+        <div id="shop" class="shop-row"></div>
+
+        <div class="action-panel">
+          <button id="fieldBest" type="button">Field Best</button>
+          <button id="slamItem" type="button">Slam Item</button>
+          <button id="endTurn" type="button">End Turn</button>
+          <button id="botStep" type="button">Bot Step</button>
+          <button id="autoPlay" type="button">Play</button>
+          <button id="reset" type="button">Reset</button>
+        </div>
+      </section>
+
+      <section class="trace-panel" aria-label="Trace">
+        <div id="items" class="items-row"></div>
+        <div id="log" class="log-list"></div>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
