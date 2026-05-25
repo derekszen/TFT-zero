@@ -26,6 +26,7 @@ uv run ruff check
 uv run python sim_smoke.py
 uv run python -m mini_tft.tools.tune_parallel_rollout --episodes 1000
 uv run python -m mini_tft.tools.inspect_episode --seed 0
+uv run python -m mini_tft.tools.inspect_episode --mode interactive --seed 0
 uv run python -m mini_tft.tools.generate_bot_dataset --episodes 100 --out rollouts/bot_dataset_v0.npz
 uv run python -m mini_tft.tools.generate_bot_dataset --episodes 1000 --workers 0 --out rollouts/bot_dataset_parallel_v0.npz
 uv run python -m mini_tft.tools.scrape_assets
