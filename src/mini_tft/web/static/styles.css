@@ -321,6 +321,31 @@ button:disabled {
   z-index: 1;
 }
 
+.drop-slot {
+  transition:
+    border-color 120ms ease,
+    filter 120ms ease,
+    transform 120ms ease;
+}
+
+.drop-slot.occupied {
+  cursor: grab;
+}
+
+.drop-slot.dragging {
+  opacity: 0.42;
+}
+
+.drop-slot.drop-hover {
+  border-color: rgba(110, 234, 190, 0.95);
+  filter: brightness(1.22);
+}
+
+.hex-cell.drop-hover::before {
+  border-color: rgba(110, 234, 190, 0.95);
+  background: rgba(65, 188, 147, 0.24);
+}
+
 .hex-cell:nth-child(2),
 .hex-cell:nth-child(5),
 .hex-cell:nth-child(8) {
@@ -360,6 +385,10 @@ button:disabled {
   padding: 0;
   overflow: visible;
   background: rgba(18, 27, 28, 0.9);
+}
+
+.bench-slot.drop-hover {
+  background: rgba(23, 72, 58, 0.94);
 }
 
 .bench-slot span {

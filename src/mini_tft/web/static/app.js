@@ -46,6 +46,20 @@ async function botStep() {
   }
 }
 
+async function moveUnit(fromZone, fromIndex, toZone, toIndex) {
+  stopAutoplay();
+  state = await api("/api/move-unit", {
+    method: "POST",
+    body: JSON.stringify({
+      from_zone: fromZone,
+      from_index: fromIndex,
+      to_zone: toZone,
+      to_index: toIndex,
+    }),
+  });
+  render();
+}
+
 async function reset() {
   stopAutoplay();
   const seed = state?.seed ?? 0;
@@ -132,11 +146,18 @@ function renderBoard() {
   root.innerHTML = "";
   for (let index = 0; index < 9; index += 1) {
     const cell = document.createElement("div");
-    cell.className = "hex-cell";
+    cell.className = "hex-cell drop-slot";
+    cell.dataset.zone = "board";
+    cell.dataset.index = String(index);
     const unit = state.board[index];
     if (unit) {
       cell.append(unitToken(unit, "board"));
+      makeDraggable(cell, "board", index);
+      cell.classList.add("occupied");
+    } else {
+      cell.classList.add("empty");
     }
+    makeDropTarget(cell, "board", index);
     root.append(cell);
   }
 }
@@ -147,17 +168,31 @@ function renderBench() {
   for (let index = 0; index < state.bench.length; index += 1) {
     const slot = document.createElement("button");
     slot.type = "button";
-    slot.className = "bench-slot";
+    slot.className = "bench-slot drop-slot";
+    slot.dataset.zone = "bench";
+    slot.dataset.index = String(index);
     const unit = state.bench[index];
     if (unit) {
       slot.append(unitToken(unit, "bench"));
-      slot.title = `Sell ${unit.name}`;
-      slot.disabled = !actionLegal(ACTION.SELL_BENCH_0 + index);
-      slot.addEventListener("click", () => postAction(ACTION.SELL_BENCH_0 + index));
+      slot.title = `Drag ${unit.name} to the board. Shift-click or right-click to sell.`;
+      slot.addEventListener("click", (event) => {
+        if (event.shiftKey && actionLegal(ACTION.SELL_BENCH_0 + index)) {
+          postAction(ACTION.SELL_BENCH_0 + index);
+        }
+      });
+      slot.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        if (actionLegal(ACTION.SELL_BENCH_0 + index)) {
+          postAction(ACTION.SELL_BENCH_0 + index);
+        }
+      });
+      makeDraggable(slot, "bench", index);
+      slot.classList.add("occupied");
     } else {
       slot.innerHTML = "<span>Empty</span>";
-      slot.disabled = true;
+      slot.classList.add("empty");
     }
+    makeDropTarget(slot, "bench", index);
     root.append(slot);
   }
 }
@@ -257,6 +292,36 @@ function setButton(id, action) {
   const button = document.getElementById(id);
   button.disabled = !actionLegal(action);
   button.onclick = () => postAction(action);
+}
+
+function makeDraggable(element, zone, index) {
+  element.draggable = true;
+  element.addEventListener("dragstart", (event) => {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/json", JSON.stringify({ zone, index }));
+    element.classList.add("dragging");
+  });
+  element.addEventListener("dragend", () => {
+    element.classList.remove("dragging");
+  });
+}
+
+function makeDropTarget(element, zone, index) {
+  element.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  });
+  element.addEventListener("dragenter", () => element.classList.add("drop-hover"));
+  element.addEventListener("dragleave", () => element.classList.remove("drop-hover"));
+  element.addEventListener("drop", (event) => {
+    event.preventDefault();
+    element.classList.remove("drop-hover");
+    const raw = event.dataTransfer.getData("application/json");
+    if (!raw) return;
+    const source = JSON.parse(raw);
+    if (source.zone === zone && source.index === index) return;
+    moveUnit(source.zone, source.index, zone, index).catch((error) => console.error(error));
+  });
 }
 
 function unitToken(unit, size) {

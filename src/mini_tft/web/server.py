@@ -108,6 +108,37 @@ class MiniTFTWebSession:
         action = self.bot.act(self.env, self.obs, self.rng)
         return self.step(action)
 
+    def move_unit(
+        self,
+        from_zone: str,
+        from_index: int,
+        to_zone: str,
+        to_index: int,
+    ) -> dict[str, Any]:
+        state = self.env.state
+        if state is None:
+            return self.reset(self.seed)
+        if state.done:
+            self._append_log("Episode is done. Reset to move units.")
+            return self.payload()
+
+        moved, message = _move_unit_between_slots(
+            state.board,
+            state.bench,
+            max_board_units=state.level,
+            from_zone=from_zone,
+            from_index=from_index,
+            to_zone=to_zone,
+            to_index=to_index,
+        )
+        self.last_reward = 0.0
+        self.last_action = None
+        self.last_legal = moved
+        self._append_log(message)
+        if moved:
+            self.obs = self.env._observe()
+        return self.payload()
+
     def payload(self) -> dict[str, Any]:
         return serialize_state(
             self.env,
@@ -276,6 +307,51 @@ def _serialize_traits(
     return sorted(traits, key=lambda item: (not item["active"], -item["count"], item["label"]))
 
 
+def _move_unit_between_slots(
+    board: list[UnitInstance | None],
+    bench: list[UnitInstance | None],
+    *,
+    max_board_units: int,
+    from_zone: str,
+    from_index: int,
+    to_zone: str,
+    to_index: int,
+) -> tuple[bool, str]:
+    zones = {"board": board, "bench": bench}
+    if from_zone not in zones or to_zone not in zones:
+        return False, "Move failed: unknown zone."
+    if not _valid_slot(zones[from_zone], from_index) or not _valid_slot(zones[to_zone], to_index):
+        return False, "Move failed: slot out of range."
+    if from_zone == to_zone and from_index == to_index:
+        return False, "Move skipped: same slot."
+
+    source = zones[from_zone]
+    target = zones[to_zone]
+    unit = source[from_index]
+    if unit is None:
+        return False, "Move failed: source slot is empty."
+
+    target_unit = target[to_index]
+    if to_zone == "board" and from_zone != "board" and target_unit is None:
+        board_count = sum(slot is not None for slot in board)
+        if board_count >= max_board_units:
+            return False, f"Move failed: board is full at level {max_board_units}."
+
+    source[from_index], target[to_index] = target_unit, unit
+    unit_name = "unit"
+    from_label = _slot_label(from_zone, from_index)
+    to_label = _slot_label(to_zone, to_index)
+    return True, f"Moved {unit_name}: {from_label} -> {to_label}"
+
+
+def _valid_slot(slots: list[UnitInstance | None], index: int) -> bool:
+    return 0 <= index < len(slots)
+
+
+def _slot_label(zone: str, index: int) -> str:
+    return f"{zone.title()} {index + 1}"
+
+
 def _stage_info(round_num: int) -> dict[str, int | str]:
     stage = ((round_num - 1) // 6) + 1
     stage_round = ((round_num - 1) % 6) + 1
@@ -363,6 +439,17 @@ class MiniTFTRequestHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/bot-step":
             self._send_json(self.server.session.bot_step())
+            return
+        if parsed.path == "/api/move-unit":
+            body = self._read_json()
+            self._send_json(
+                self.server.session.move_unit(
+                    from_zone=str(body.get("from_zone", "")),
+                    from_index=int(body.get("from_index", -1)),
+                    to_zone=str(body.get("to_zone", "")),
+                    to_index=int(body.get("to_index", -1)),
+                )
+            )
             return
         self.send_error(HTTPStatus.NOT_FOUND)
 
