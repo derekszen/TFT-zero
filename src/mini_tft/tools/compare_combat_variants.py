@@ -25,6 +25,10 @@ def compare_variants(
                 "status": report["status"],
                 "passed": report["passed"],
                 "total": report["total"],
+                "decision_score": _report_decision_score(report),
+                "margin_score": report.get("margin_score", 0.0),
+                "mean_surplus": report.get("mean_surplus", 0.0),
+                "mean_normalized_surplus": report.get("mean_normalized_surplus", 0.0),
                 "calls_per_sec": report["benchmark"]["calls_per_sec"],
                 "failures": [
                     fixture["name"]
@@ -40,20 +44,38 @@ def format_markdown(rows: list[dict[str, Any]]) -> str:
     lines = [
         "# MiniTFT Combat Variant Comparison",
         "",
-        "| Variant | Commit | Score | Calls/sec | Failing Fixtures | Path |",
-        "| --- | --- | ---: | ---: | --- | --- |",
+        "| Variant | Commit | Score | Decision | Margin Score | Mean Surplus | "
+        "Mean Norm Surplus | Calls/sec | Failing Fixtures | Path |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |",
     ]
     ranked = sorted(
         rows,
-        key=lambda item: (-item["passed"], -item["calls_per_sec"], item["name"]),
+        key=lambda item: (
+            -item["passed"],
+            -item["decision_score"],
+            -item["calls_per_sec"],
+            item["name"],
+        ),
     )
     for row in ranked:
         failures = ", ".join(row["failures"]) if row["failures"] else "None"
         lines.append(
             f"| {row['name']} | `{row['commit']}` | {row['passed']}/{row['total']} | "
+            f"{row['decision_score']:.3f} | {row['margin_score']:.3f} | "
+            f"{row['mean_surplus']:.3f} | {row['mean_normalized_surplus']:.3f} | "
             f"{row['calls_per_sec']:.1f} | {failures} | `{row['path']}` |"
         )
     return "\n".join(lines) + "\n"
+
+
+def _report_decision_score(report: dict[str, Any]) -> float:
+    """Return a ranking score, tolerating older combat_eval report schemas."""
+
+    if "decision_score" in report:
+        return float(report["decision_score"])
+    total = max(int(report.get("total", 0)), 1)
+    passed = int(report.get("passed", 0))
+    return (passed / total) * 100.0
 
 
 def _run_combat_eval(path: Path, benchmark_iters: int) -> dict[str, Any]:
