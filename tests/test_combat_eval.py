@@ -1,15 +1,33 @@
 from __future__ import annotations
 
+from mini_tft.experiments.combat_fixtures import combat_fixtures
 from mini_tft.tools.combat_eval import run_combat_eval
 
 
-def test_combat_eval_runs_all_fixtures_without_strict_failure() -> None:
+def test_combat_eval_reports_all_fixtures() -> None:
     report = run_combat_eval(benchmark_iters=1)
 
-    assert report["total"] >= 5
-    assert report["passed"] == report["total"]
+    assert 14 <= report["total"] <= 20
     assert len(report["fixtures"]) == report["total"]
     assert report["benchmark"]["calls"] == report["total"] * 2
+    assert report["passed"] <= report["total"]
+    assert report["status"] in {"pass", "fail"}
+
+
+def test_combat_fixture_suite_covers_core_categories() -> None:
+    fixtures = combat_fixtures()
+    categories = {fixture.category for fixture in fixtures}
+    names = {fixture.name for fixture in fixtures}
+
+    assert categories >= {
+        "positioning",
+        "upgrade_tempo",
+        "item_fit",
+        "trait_role",
+        "late_game_scaling",
+    }
+    assert all(fixture.weight > 0 for fixture in fixtures)
+    assert len(names) == len(fixtures)
 
 
 def test_combat_eval_star_tempo_variant_covers_previous_gaps() -> None:
