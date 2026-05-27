@@ -4,6 +4,15 @@ from mini_tft.experiments.combat_fixtures import combat_fixtures
 from mini_tft.tools.combat_eval import format_markdown, run_combat_eval
 from mini_tft.tools.compare_combat_variants import format_markdown as format_variant_markdown
 
+REQUIRED_GAP_FIXTURES = {
+    "two_star_three_cost_tank_beats_one_star_fillers",
+    "three_star_low_cost_core_beats_two_star_pair",
+    "carry_items_on_carry_beat_carry_items_on_support",
+    "disruption_items_on_support_beat_disruption_items_on_carry",
+    "ranger_pair_beats_same_cost_no_trait_carries",
+    "six_noble_capped_board_beats_high_cost_goodstuff",
+}
+
 
 def test_combat_eval_reports_all_fixtures() -> None:
     report = run_combat_eval(benchmark_iters=1)
@@ -17,6 +26,28 @@ def test_combat_eval_reports_all_fixtures() -> None:
     assert "margin_score" in report
     assert "mean_normalized_surplus" in report
     assert report["category_summaries"]
+
+
+def test_combat_eval_passes_all_current_fixtures() -> None:
+    report = run_combat_eval(benchmark_iters=0)
+    failures = [
+        row["name"]
+        for row in report["fixtures"]
+        if row["status"] != "pass"
+    ]
+
+    assert report["passed"] == report["total"], failures
+
+
+def test_combat_eval_closes_known_v2_gap_fixtures() -> None:
+    report = run_combat_eval(benchmark_iters=0)
+    rows = {row["name"]: row for row in report["fixtures"]}
+
+    assert REQUIRED_GAP_FIXTURES <= rows.keys()
+    for name in REQUIRED_GAP_FIXTURES:
+        row = rows[name]
+        assert row["status"] == "pass", row
+        assert row["margin"] >= row["min_margin"]
 
 
 def test_combat_fixture_suite_covers_core_categories() -> None:

@@ -171,7 +171,9 @@ def combat_fixtures() -> list[CombatFixture]:
         ),
         CombatFixture(
             name="carry_items_on_carry_beat_carry_items_on_support",
-            better_board=_board([_unit(20), None, None, None, None, None, _unit(18, items=[1, 2])]),
+            better_board=_board(
+                [_unit(20), None, None, None, None, None, _unit(18, items=[1, 2]), _unit(24)]
+            ),
             worse_board=_board(
                 [_unit(20), None, None, None, None, None, _unit(18), _unit(24, items=[1, 2])]
             ),

@@ -10,12 +10,30 @@ import numpy as np
 from mini_tft.core.config import EnvConfig
 from mini_tft.core.set_data import GameData
 from mini_tft.core.state import UnitInstance
-from mini_tft.core.traits import active_trait_effects
 
 STAR_MULTIPLIER = {
     1: 1.0,
     2: 1.8,
     3: 3.4,
+}
+STAR_RELIABILITY_BONUS = {
+    1: 0.0,
+    2: 1.55,
+    3: 5.20,
+}
+MATCHED_ITEM_ROLE_BONUS = {
+    "carry": 7.0,
+    "tank": 5.0,
+    "support": 4.0,
+}
+MISMATCHED_ITEM_ROLE_PENALTY = {
+    "carry": 9.0,
+    "tank": 5.0,
+    "support": 2.5,
+}
+TRAIT_BREAKPOINT_FLAT_BONUS = {
+    ("ranger", 2): 5.0,
+    ("noble", 6): 35.0,
 }
 
 
@@ -45,18 +63,22 @@ def board_strength(board: list[UnitInstance | None], data: GameData) -> CombatSt
     role_counts = {"carry": 0, "tank": 0, "support": 0}
     item_flat_power = 0.0
     item_enemy_penalty = 0.0
+    item_fit_power = 0.0
     upgrade_bonus = 0.0
+    unit_ids: set[int] = set()
 
     for slot_index, unit in enumerate(board):
         if unit is None:
             continue
         unit_def = data.units[unit.unit_id]
+        unit_ids.add(unit.unit_id)
         item_multiplier = 1.0
         for item_id in unit.items:
             item = data.items[item_id]
             item_flat_power += item.effects.get("flat_power", 0.0)
             item_enemy_penalty += item.effects.get("enemy_power_penalty", 0.0)
             item_multiplier *= item.effects.get(f"{unit_def.role}_multiplier", 1.0)
+            item_fit_power += _item_role_fit_power(unit_def.role, item.tags)
 
         positioned_power = (
             unit_standalone_power(unit, data)
@@ -72,7 +94,8 @@ def board_strength(board: list[UnitInstance | None], data: GameData) -> CombatSt
     support_multiplier = 1.0
     flat_power = item_flat_power
     enemy_penalty = item_enemy_penalty
-    active_traits = active_trait_effects(board, data)
+    counts = _trait_counts_from_unit_ids(unit_ids, data)
+    active_traits = _active_trait_effects_from_counts(counts, data)
 
     for effects in active_traits.values():
         flat_power += effects.get("flat_power", 0.0)
@@ -86,8 +109,10 @@ def board_strength(board: list[UnitInstance | None], data: GameData) -> CombatSt
         + role_power["tank"] * tank_multiplier
         + role_power["support"] * support_multiplier
         + flat_power
+        + item_fit_power
         + _board_balance_bonus(role_power)
         + _skirmish_structure_bonus(role_power, role_counts)
+        + _trait_breakpoint_bonus(counts, data)
         + upgrade_bonus
     )
     return CombatStats(
@@ -187,4 +212,45 @@ def _upgrade_reliability_bonus(unit: UnitInstance, data: GameData) -> float:
     if unit.stars <= 1:
         return 0.0
     unit_def = data.units[unit.unit_id]
-    return unit_def.base_power * 0.55 * (unit.stars - 1)
+    return unit_def.base_power * STAR_RELIABILITY_BONUS.get(unit.stars, 0.0)
+
+
+def _item_role_fit_power(role: str, tags: tuple[str, ...]) -> float:
+    if not tags:
+        return 0.0
+    if role in tags:
+        return MATCHED_ITEM_ROLE_BONUS.get(role, 0.0)
+    return -sum(MISMATCHED_ITEM_ROLE_PENALTY.get(tag, 0.0) for tag in tags)
+
+
+def _trait_breakpoint_bonus(counts: dict[str, int], data: GameData) -> float:
+    bonus = 0.0
+    for trait_id, count in counts.items():
+        trait = data.traits[trait_id]
+        reached = [breakpoint for breakpoint in trait.breakpoints if breakpoint <= count]
+        if not reached:
+            continue
+        breakpoint = max(reached)
+        bonus += TRAIT_BREAKPOINT_FLAT_BONUS.get((trait_id, breakpoint), 0.0)
+    return bonus
+
+
+def _trait_counts_from_unit_ids(unit_ids: set[int], data: GameData) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for unit_id in unit_ids:
+        for trait in data.units[unit_id].traits:
+            counts[trait] = counts.get(trait, 0) + 1
+    return counts
+
+
+def _active_trait_effects_from_counts(
+    counts: dict[str, int],
+    data: GameData,
+) -> dict[str, dict[str, float]]:
+    active: dict[str, dict[str, float]] = {}
+    for trait_id, count in counts.items():
+        trait = data.traits[trait_id]
+        reached = [breakpoint for breakpoint in trait.breakpoints if breakpoint <= count]
+        if reached:
+            active[trait_id] = trait.breakpoints[max(reached)]
+    return active

@@ -3,7 +3,7 @@
   {"id": 2, "name": "Vayne", "cost": 1, "traits": ["noble", "ranger"], "role": "carry", "base_power": 7.5},
   {"id": 3, "name": "Warwick", "cost": 1, "traits": ["wild", "brawler"], "role": "tank", "base_power": 7.8},
   {"id": 4, "name": "Nidalee", "cost": 1, "traits": ["wild", "shapeshifter"], "role": "carry", "base_power": 7.2},
-  {"id": 5, "name": "Darius", "cost": 1, "traits": ["imperial", "knight"], "role": "tank", "base_power": 7.9},
+  {"id": 5, "name": "Darius", "cost": 1, "traits": ["noble", "imperial", "knight"], "role": "tank", "base_power": 7.9},
   {"id": 6, "name": "Kassadin", "cost": 1, "traits": ["void", "sorcerer"], "role": "support", "base_power": 7.0},
   {"id": 7, "name": "Lucian", "cost": 2, "traits": ["noble", "gunslinger"], "role": "carry", "base_power": 11.0},
   {"id": 8, "name": "Varus", "cost": 2, "traits": ["demon", "ranger"], "role": "carry", "base_power": 10.8},
