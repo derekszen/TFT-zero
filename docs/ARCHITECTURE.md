@@ -71,7 +71,8 @@ Keep hidden RNG state and future shops out of observations.
 
 ## Action Boundary
 
-v0 should keep a small discrete action space:
+v0 should keep a discrete action space that separates macro decisions from
+explicit board membership decisions:
 
 - end turn
 - roll shop
@@ -80,11 +81,16 @@ v0 should keep a small discrete action space:
 - sell a bench slot
 - field best board
 - slam best item
+- move bench slot to board slot
+- move board slot to bench slot
+
+The simulator keeps `field best board` as a heuristic/debug convenience, but RL
+policies can use masked placement actions directly. Board slot coordinates are
+currently membership slots only; exact hex positioning does not affect combat in
+v0.
 
 Later versions can add:
 
-- move bench to board
-- move board to bench
 - combine units
 - slam or move items
 - choose carousel or augment-like rewards

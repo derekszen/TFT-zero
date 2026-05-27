@@ -10,6 +10,7 @@ from mini_tft.bots import (
     RerollBot,
     TraitCommitBot,
 )
+from mini_tft.core.actions import NUM_ACTIONS
 from mini_tft.core.config import EnvConfig
 from mini_tft.rl.dataset import load_dataset
 from mini_tft.rl.gym_env import MiniTFTGymEnv
@@ -57,5 +58,5 @@ def test_generate_and_load_parallel_dataset(tmp_path) -> None:
     assert metrics["workers"] == 2
     assert dataset.obs.shape == dataset.next_obs.shape
     assert dataset.actions.shape[0] == dataset.obs.shape[0]
-    assert dataset.masks.shape[1] == 19
+    assert dataset.masks.shape[1] == NUM_ACTIONS
     assert dataset.dones.sum() == 4

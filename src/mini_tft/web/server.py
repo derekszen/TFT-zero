@@ -98,7 +98,7 @@ class MiniTFTWebSession:
         suffix = ""
         if terminated or truncated:
             suffix = f" -> done: {self.env.state.final_reason if self.env.state else 'unknown'}"
-        action_label = ACTION_LABELS.get(Action(action), action_name(action))
+        action_label = _action_label(action)
         self._append_log(f"{action_label}: {result}, reward {reward:.3f}{suffix}")
         return self.payload()
 
@@ -216,7 +216,7 @@ def serialize_state(
             {
                 "id": index,
                 "name": action_name(index),
-                "label": ACTION_LABELS.get(Action(index), action_name(index)),
+                "label": _action_label(index),
                 "legal": bool(mask[index]),
             }
             for index in range(NUM_ACTIONS)
@@ -226,7 +226,7 @@ def serialize_state(
             "action": last_action,
             "action_label": None
             if last_action is None
-            else ACTION_LABELS.get(Action(last_action), action_name(last_action)),
+            else _action_label(last_action),
             "legal": last_legal,
         },
         "log": log,
@@ -305,6 +305,14 @@ def _serialize_traits(
             }
         )
     return sorted(traits, key=lambda item: (not item["active"], -item["count"], item["label"]))
+
+
+def _action_label(action: int) -> str:
+    try:
+        enum_action = Action(action)
+    except ValueError:
+        return action_name(action).replace("_", " ").title()
+    return ACTION_LABELS.get(enum_action, action_name(action))
 
 
 def _move_unit_between_slots(

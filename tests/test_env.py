@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from mini_tft import EnvConfig, MiniTFTEnv
-from mini_tft.core.actions import NUM_ACTIONS, Action
+from mini_tft.core.actions import NUM_ACTIONS, Action, move_bench_to_board_action
 from mini_tft.core.state import state_signature
 
 
@@ -52,3 +52,30 @@ def test_episode_terminates_at_max_round() -> None:
     assert terminated
     assert env.state is not None
     assert env.state.final_reason in {"hp_zero", "max_round"}
+
+
+def test_explicit_placement_action_moves_unit_from_bench_to_board() -> None:
+    env = MiniTFTEnv(EnvConfig(seed=11, starting_gold=10))
+    env.reset(seed=11)
+
+    buy_action = next(
+        action
+        for action, legal in enumerate(env.action_masks())
+        if legal and Action.BUY_SHOP_0 <= action <= Action.BUY_SHOP_4
+    )
+    env.step(buy_action)
+    assert env.state is not None
+    unit_id = env.state.bench[0].unit_id if env.state.bench[0] is not None else None
+
+    action = move_bench_to_board_action(0, 0)
+    obs, reward, terminated, truncated, info = env.step(action)
+
+    assert env.observation_space.contains(obs)
+    assert reward > 0
+    assert not terminated
+    assert not truncated
+    assert info["legal_action"] is True
+    assert env.state.board[0] is not None
+    assert env.state.board[0].unit_id == unit_id
+    assert env.state.bench[0] is None
+    assert env.state.step_count == 2

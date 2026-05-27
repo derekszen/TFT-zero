@@ -28,6 +28,7 @@ Done when:
 - interest and income
 - auto-combine upgrades
 - field best board
+- explicit bench-to-board and board-to-bench placement actions
 - slam abstract items
 - abstract combat against enemy curve
 - reward shaping

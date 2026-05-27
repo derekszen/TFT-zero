@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from mini_tft.core.actions import Action
+from mini_tft.core.actions import NUM_ACTIONS, Action, move_bench_to_board_action
 from mini_tft.core.state import UnitInstance
 from mini_tft.web.server import MiniTFTWebSession
 
@@ -17,6 +17,7 @@ def test_web_session_payload_exposes_interactive_state() -> None:
     assert len(payload["shop"]) == 5
     assert len(payload["board"]) == 9
     assert len(payload["bench"]) == 9
+    assert len(payload["actions"]) == NUM_ACTIONS
     assert payload["actions"][Action.END_TURN]["legal"] is True
 
 
@@ -43,6 +44,20 @@ def test_web_session_can_manually_move_unit_from_bench_to_board() -> None:
 
     assert payload["last"]["legal"] is True
     assert payload["status"]["step_count"] == 0
+    assert payload["board"][0]["id"] == 1
+    assert payload["bench"][0] is None
+
+
+def test_web_session_can_step_explicit_placement_action() -> None:
+    session = MiniTFTWebSession(seed=16)
+    assert session.env.state is not None
+    session.env.state.bench[0] = UnitInstance(unit_id=1)
+
+    payload = session.step(move_bench_to_board_action(0, 0))
+
+    assert payload["last"]["legal"] is True
+    assert payload["last"]["action_label"] == "Move Bench 1 To Board 1"
+    assert payload["status"]["step_count"] == 1
     assert payload["board"][0]["id"] == 1
     assert payload["bench"][0] is None
 

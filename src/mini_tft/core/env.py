@@ -9,7 +9,16 @@ import numpy as np
 from gymnasium import spaces
 from numpy.typing import NDArray
 
-from mini_tft.core.actions import BUY_SHOP_OFFSET, SELL_BENCH_OFFSET, Action
+from mini_tft.core.actions import (
+    BUY_SHOP_OFFSET,
+    NUM_ACTIONS,
+    SELL_BENCH_OFFSET,
+    Action,
+    decode_move_bench_to_board_action,
+    decode_move_board_to_bench_action,
+    is_move_bench_to_board_action,
+    is_move_board_to_bench_action,
+)
 from mini_tft.core.board import field_best_board
 from mini_tft.core.combat import board_strength, resolve_combat
 from mini_tft.core.config import EnvConfig
@@ -35,7 +44,7 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
         self.data: GameData = load_set(self.config.dataset)
         self.rng = np.random.default_rng(self.config.seed)
         self.state: GameState | None = None
-        self.action_space = spaces.Discrete(19)
+        self.action_space = spaces.Discrete(NUM_ACTIONS)
         self.observation_space = spaces.Box(
             low=OBS_CLIP_LOW,
             high=OBS_CLIP_HIGH,
@@ -127,6 +136,12 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
             return 0.02 if field_best_board(self._require_state(), self.data, self.config) else 0.0
         if action == Action.SLAM_BEST_ITEM:
             return 0.02 if slam_best_item(self._require_state(), self.data, self.config) else 0.0
+        if is_move_bench_to_board_action(action):
+            bench_index, board_index = decode_move_bench_to_board_action(action)
+            return 0.01 if self._move_bench_to_board(bench_index, board_index) else 0.0
+        if is_move_board_to_bench_action(action):
+            board_index, bench_index = decode_move_board_to_bench_action(action)
+            return 0.01 if self._move_board_to_bench(board_index, bench_index) else 0.0
         return 0.0
 
     def _roll(self) -> float:
@@ -171,6 +186,25 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
         state.bench[bench_index] = None
         state.total_units_sold += 1
         return -0.01
+
+    def _move_bench_to_board(self, bench_index: int, board_index: int) -> bool:
+        state = self._require_state()
+        unit = state.bench[bench_index]
+        if unit is None:
+            return False
+        target = state.board[board_index]
+        if target is None and sum(slot is not None for slot in state.board) >= state.level:
+            return False
+        state.bench[bench_index], state.board[board_index] = target, unit
+        return True
+
+    def _move_board_to_bench(self, board_index: int, bench_index: int) -> bool:
+        state = self._require_state()
+        unit = state.board[board_index]
+        if unit is None:
+            return False
+        state.board[board_index], state.bench[bench_index] = state.bench[bench_index], unit
+        return True
 
     def _end_turn(self) -> float:
         state = self._require_state()

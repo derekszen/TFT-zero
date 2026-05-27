@@ -5,7 +5,14 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
-from mini_tft.core.actions import BUY_SHOP_OFFSET, NUM_ACTIONS, SELL_BENCH_OFFSET, Action
+from mini_tft.core.actions import (
+    BUY_SHOP_OFFSET,
+    NUM_ACTIONS,
+    SELL_BENCH_OFFSET,
+    Action,
+    move_bench_to_board_action,
+    move_board_to_bench_action,
+)
 from mini_tft.core.board import would_change_best_board
 from mini_tft.core.config import EnvConfig
 from mini_tft.core.ids import EMPTY
@@ -46,4 +53,19 @@ def legal_action_mask(
         for unit in state.board
     )
     mask[Action.SLAM_BEST_ITEM] = has_item and has_target
+
+    board_count = sum(unit is not None for unit in state.board)
+    has_board_room = board_count < state.level
+    for bench_index, unit in enumerate(state.bench):
+        if unit is None:
+            continue
+        for board_index, board_unit in enumerate(state.board):
+            if board_unit is not None or has_board_room:
+                mask[move_bench_to_board_action(bench_index, board_index)] = True
+
+    for board_index, unit in enumerate(state.board):
+        if unit is None:
+            continue
+        for bench_index in range(len(state.bench)):
+            mask[move_board_to_bench_action(board_index, bench_index)] = True
     return mask
