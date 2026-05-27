@@ -137,6 +137,8 @@ def serialize_state(
     state = env._require_state()
     stats = board_strength(state.board, env.data)
     enemy_index = min(state.round - 1, len(env.data.enemy_curve) - 1)
+    stage = _stage_info(state.round)
+    enemy_next = round(env.data.enemy_curve[enemy_index], 2)
     mask = env.action_masks()
     active = active_trait_effects(state.board, env.data)
     counts = trait_counts(state.board, env.data)
@@ -145,6 +147,9 @@ def serialize_state(
         "seed": seed,
         "status": {
             "round": state.round,
+            "stage": stage["stage"],
+            "stage_round": stage["stage_round"],
+            "stage_label": stage["label"],
             "max_round": env.config.max_round,
             "hp": state.hp,
             "gold": state.gold,
@@ -158,9 +163,10 @@ def serialize_state(
             "last_board_strength": round(state.last_board_strength, 2),
             "last_enemy_strength": round(state.last_enemy_strength, 2),
             "strength": round(stats.strength, 2),
-            "enemy_next": round(env.data.enemy_curve[enemy_index], 2),
+            "enemy_next": enemy_next,
             "enemy_power_penalty": round(stats.enemy_power_penalty, 2),
         },
+        "enemy": _serialize_enemy(stage["label"], enemy_next),
         "shop": [
             None if unit_id == EMPTY else _serialize_unit_def(env, unit_id, asset_manifest)
             for unit_id in state.shop
@@ -268,6 +274,32 @@ def _serialize_traits(
             }
         )
     return sorted(traits, key=lambda item: (not item["active"], -item["count"], item["label"]))
+
+
+def _stage_info(round_num: int) -> dict[str, int | str]:
+    stage = ((round_num - 1) // 6) + 1
+    stage_round = ((round_num - 1) % 6) + 1
+    return {
+        "stage": stage,
+        "stage_round": stage_round,
+        "label": f"Stage {stage}-{stage_round}",
+    }
+
+
+def _serialize_enemy(stage_label: str, strength: float) -> dict[str, Any]:
+    slot_count = min(6, max(2, int(strength // 45) + 2))
+    tier = min(5, max(1, int(strength // 70) + 1))
+    return {
+        "label": f"{stage_label} enemy",
+        "strength": strength,
+        "slots": [
+            {
+                "name": f"Enemy {index + 1}",
+                "tier": tier,
+            }
+            for index in range(slot_count)
+        ],
+    }
 
 
 def _load_asset_manifest() -> dict[str, Any]:

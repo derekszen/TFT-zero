@@ -63,7 +63,7 @@ function actionLegal(action) {
 function render() {
   if (!state) return;
 
-  document.getElementById("stage").textContent = `Stage ${state.status.round}`;
+  document.getElementById("stage").textContent = state.status.stage_label;
   document.getElementById("phase").textContent = state.status.done ? "Done" : "Planning";
   document.getElementById("timer").textContent = state.status.done ? "--" : "30";
   document.getElementById("capacity").textContent = `${boardCount()} / ${state.status.level}`;
@@ -75,6 +75,7 @@ function render() {
   document.getElementById("enemyNext").textContent = `Enemy ${state.status.enemy_next}`;
 
   renderTraits();
+  renderEnemy();
   renderBoard();
   renderBench();
   renderShop();
@@ -86,6 +87,22 @@ function render() {
 
 function boardCount() {
   return state.board.filter(Boolean).length;
+}
+
+function renderEnemy() {
+  const root = document.getElementById("enemySquad");
+  const gate = document.getElementById("enemyGate");
+  root.innerHTML = "";
+  gate.textContent = `${state.enemy.label} · ${state.enemy.strength}`;
+  for (const slot of state.enemy.slots) {
+    const token = document.createElement("div");
+    token.className = `enemy-token tier-${slot.tier}`;
+    token.innerHTML = `
+      <div class="enemy-orb">${slot.tier}</div>
+      <div class="enemy-name">${slot.name}</div>
+    `;
+    root.append(token);
+  }
 }
 
 function renderTraits() {

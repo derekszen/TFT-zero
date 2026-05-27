@@ -10,6 +10,9 @@ def test_web_session_payload_exposes_interactive_state() -> None:
     payload = session.payload()
 
     assert payload["status"]["round"] == 1
+    assert payload["status"]["stage_label"] == "Stage 1-1"
+    assert payload["enemy"]["label"] == "Stage 1-1 enemy"
+    assert len(payload["enemy"]["slots"]) >= 2
     assert len(payload["shop"]) == 5
     assert len(payload["board"]) == 9
     assert len(payload["bench"]) == 9
