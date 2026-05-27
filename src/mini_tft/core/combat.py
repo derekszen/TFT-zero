@@ -18,14 +18,6 @@ STAR_MULTIPLIER = {
     3: 3.4,
 }
 
-FRONT_SLOTS = {0, 1, 2}
-BACK_SLOTS = {6, 7, 8}
-STAR_TEMPO_BONUS = {
-    1: 0.0,
-    2: 4.0,
-    3: 9.0,
-}
-
 
 @dataclass(frozen=True)
 class CombatStats:
@@ -50,12 +42,12 @@ def unit_standalone_power(unit: UnitInstance, data: GameData) -> float:
 
 def board_strength(board: list[UnitInstance | None], data: GameData) -> CombatStats:
     role_power = {"carry": 0.0, "tank": 0.0, "support": 0.0}
+    role_counts = {"carry": 0, "tank": 0, "support": 0}
     item_flat_power = 0.0
     item_enemy_penalty = 0.0
-    star_tempo_power = 0.0
-    formation_power = 0.0
+    upgrade_bonus = 0.0
 
-    for slot, unit in enumerate(board):
+    for slot_index, unit in enumerate(board):
         if unit is None:
             continue
         unit_def = data.units[unit.unit_id]
@@ -65,9 +57,15 @@ def board_strength(board: list[UnitInstance | None], data: GameData) -> CombatSt
             item_flat_power += item.effects.get("flat_power", 0.0)
             item_enemy_penalty += item.effects.get("enemy_power_penalty", 0.0)
             item_multiplier *= item.effects.get(f"{unit_def.role}_multiplier", 1.0)
-        role_power[unit_def.role] += unit_standalone_power(unit, data) * item_multiplier
-        star_tempo_power += STAR_TEMPO_BONUS.get(unit.stars, 0.0)
-        formation_power += _formation_bonus(slot, unit_def.role)
+
+        positioned_power = (
+            unit_standalone_power(unit, data)
+            * item_multiplier
+            * _role_position_multiplier(slot_index, unit_def.role)
+        )
+        role_power[unit_def.role] += positioned_power
+        role_counts[unit_def.role] += 1
+        upgrade_bonus += _upgrade_reliability_bonus(unit, data)
 
     carry_multiplier = 1.0
     tank_multiplier = 1.0
@@ -88,9 +86,9 @@ def board_strength(board: list[UnitInstance | None], data: GameData) -> CombatSt
         + role_power["tank"] * tank_multiplier
         + role_power["support"] * support_multiplier
         + flat_power
-        + star_tempo_power
-        + formation_power
         + _board_balance_bonus(role_power)
+        + _skirmish_structure_bonus(role_power, role_counts)
+        + upgrade_bonus
     )
     return CombatStats(
         strength=max(0.0, strength),
@@ -153,16 +151,40 @@ def _board_balance_bonus(role_power: dict[str, float]) -> float:
     return 0.0
 
 
-def _formation_bonus(slot: int, role: str) -> float:
-    if role == "tank":
-        if slot in FRONT_SLOTS:
-            return 1.5
-        if slot in BACK_SLOTS:
-            return -1.5
+def _role_position_multiplier(slot_index: int, role: str) -> float:
+    """Approximate combat uptime from TFT-like front/mid/back rows.
+
+    Slots 0-2 are treated as frontline, 3-5 as midline, and 6-8 as backline.
+    This keeps combat scalar and fast while letting manual placement matter.
+    """
+
+    row = slot_index // 3
+    if row == 0:
+        return {"tank": 1.18, "carry": 0.82, "support": 0.90}.get(role, 1.0)
+    if row == 1:
+        return {"tank": 1.02, "carry": 1.00, "support": 1.05}.get(role, 1.0)
+    return {"tank": 0.72, "carry": 1.14, "support": 1.10}.get(role, 1.0)
+
+
+def _skirmish_structure_bonus(role_power: dict[str, float], role_counts: dict[str, int]) -> float:
+    """Reward boards that look like stable skirmishes, not just raw piles."""
+
+    tank_power = role_power["tank"]
+    carry_power = role_power["carry"]
+    support_power = role_power["support"]
+
+    bonus = 0.0
+    if tank_power > 0.0 and carry_power > 0.0:
+        bonus += min(tank_power, carry_power) * 0.18
+    if support_power > 0.0 and tank_power + carry_power > 0.0:
+        bonus += min(support_power * 0.14, (tank_power + carry_power) * 0.06)
+    if role_counts["tank"] == 0 and role_counts["carry"] >= 2:
+        bonus -= 4.0
+    return bonus
+
+
+def _upgrade_reliability_bonus(unit: UnitInstance, data: GameData) -> float:
+    if unit.stars <= 1:
         return 0.0
-    if role in {"carry", "support"}:
-        if slot in BACK_SLOTS:
-            return 1.0
-        if slot in FRONT_SLOTS:
-            return -0.8
-    return 0.0
+    unit_def = data.units[unit.unit_id]
+    return unit_def.base_power * 0.55 * (unit.stars - 1)
