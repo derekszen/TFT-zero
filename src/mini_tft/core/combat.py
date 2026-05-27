@@ -18,6 +18,14 @@ STAR_MULTIPLIER = {
     3: 3.4,
 }
 
+FRONT_SLOTS = {0, 1, 2}
+BACK_SLOTS = {6, 7, 8}
+STAR_TEMPO_BONUS = {
+    1: 0.0,
+    2: 4.0,
+    3: 9.0,
+}
+
 
 @dataclass(frozen=True)
 class CombatStats:
@@ -44,8 +52,10 @@ def board_strength(board: list[UnitInstance | None], data: GameData) -> CombatSt
     role_power = {"carry": 0.0, "tank": 0.0, "support": 0.0}
     item_flat_power = 0.0
     item_enemy_penalty = 0.0
+    star_tempo_power = 0.0
+    formation_power = 0.0
 
-    for unit in board:
+    for slot, unit in enumerate(board):
         if unit is None:
             continue
         unit_def = data.units[unit.unit_id]
@@ -56,6 +66,8 @@ def board_strength(board: list[UnitInstance | None], data: GameData) -> CombatSt
             item_enemy_penalty += item.effects.get("enemy_power_penalty", 0.0)
             item_multiplier *= item.effects.get(f"{unit_def.role}_multiplier", 1.0)
         role_power[unit_def.role] += unit_standalone_power(unit, data) * item_multiplier
+        star_tempo_power += STAR_TEMPO_BONUS.get(unit.stars, 0.0)
+        formation_power += _formation_bonus(slot, unit_def.role)
 
     carry_multiplier = 1.0
     tank_multiplier = 1.0
@@ -76,6 +88,8 @@ def board_strength(board: list[UnitInstance | None], data: GameData) -> CombatSt
         + role_power["tank"] * tank_multiplier
         + role_power["support"] * support_multiplier
         + flat_power
+        + star_tempo_power
+        + formation_power
         + _board_balance_bonus(role_power)
     )
     return CombatStats(
@@ -136,4 +150,19 @@ def _board_balance_bonus(role_power: dict[str, float]) -> float:
         return -8.0
     if not has_carry:
         return -8.0
+    return 0.0
+
+
+def _formation_bonus(slot: int, role: str) -> float:
+    if role == "tank":
+        if slot in FRONT_SLOTS:
+            return 1.5
+        if slot in BACK_SLOTS:
+            return -1.5
+        return 0.0
+    if role in {"carry", "support"}:
+        if slot in BACK_SLOTS:
+            return 1.0
+        if slot in FRONT_SLOTS:
+            return -0.8
     return 0.0
