@@ -29,6 +29,10 @@ uv run python -m mini_tft.tools.inspect_episode --seed 0
 uv run python -m mini_tft.tools.inspect_episode --mode interactive --seed 0
 uv run python -m mini_tft.tools.generate_bot_dataset --episodes 100 --out rollouts/bot_dataset_v0.npz
 uv run python -m mini_tft.tools.generate_bot_dataset --episodes 1000 --workers 0 --out rollouts/bot_dataset_parallel_v0.npz
+uv run python -m mini_tft.tools.generate_bot_dataset --suite fastlevel --episodes 5000 --workers 0 --out rollouts/fastlevel_bc_5k.npz
+uv run python -m mini_tft.rl.pretrain_bc --dataset rollouts/fastlevel_bc_5k.npz --epochs 80 --hidden-sizes 256,256 --out checkpoints/bc_fastlevel_5k_e80_h256
+uv run python -m mini_tft.rl.train_ppo --init checkpoints/bc_fastlevel_5k_e80_h256.zip --timesteps 250000 --num-envs 8 --device cpu --out checkpoints/ppo_from_bc_fastlevel_250k_h256
+uv run python -m mini_tft.rl.evaluate_policy --episodes 100 --checkpoint checkpoints/ppo_from_bc_fastlevel_250k_h256.zip
 uv run python -m mini_tft.tools.scrape_assets
 ```
 
@@ -66,6 +70,17 @@ models designed to support fast RL iteration.
 - [Data Generation](docs/DATA_GENERATION.md)
 - [Training Plan](docs/TRAINING.md)
 - [Assets](docs/ASSETS.md)
+
+## Current Baseline
+
+Fixed-seed eval over seeds `1000..1099` now has a warm-started PPO policy above
+the strongest heuristic:
+
+| Policy | Mean final HP | Survival rate | Mean final strength |
+| --- | ---: | ---: | ---: |
+| FastLevelBot | 69.05 | 0.99 | 304.52 |
+| BC FastLevel 5k/e80/h256 | 66.30 | 1.00 | 295.88 |
+| PPO from BC 250k/h256 | 70.87 | 1.00 | 312.49 |
 
 ## Development Rules
 

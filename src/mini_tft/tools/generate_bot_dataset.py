@@ -37,6 +37,25 @@ def default_bots() -> list[BaseBot]:
     ]
 
 
+def bot_suite(name: str) -> list[BaseBot]:
+    """Return a named bot suite for rollout generation."""
+
+    suites = {
+        "default": default_bots,
+        "fastlevel": lambda: [FastLevelBot()],
+        "expert": lambda: [
+            FastLevelBot(),
+            TraitCommitBot("glacial", "TraitCommitBot[glacial]"),
+            TraitCommitBot("ranger", "TraitCommitBot[ranger]"),
+        ],
+    }
+    try:
+        return suites[name]()
+    except KeyError as exc:
+        choices = ", ".join(sorted(suites))
+        raise ValueError(f"unknown bot suite {name!r}; choose one of: {choices}") from exc
+
+
 def generate_dataset(
     episodes: int,
     output: Path,
@@ -60,13 +79,15 @@ def generate_dataset_parallel(
     seed: int = 0,
     workers: int | None = None,
     chunk_size: int | None = None,
+    bots: list[BaseBot] | None = None,
 ) -> dict[str, float | int | str]:
     """Generate rollout data in worker processes and write one `.npz` file."""
 
     actual_workers = resolve_worker_count(workers, episodes)
     started = time.perf_counter()
+    actual_bots = bots or default_bots()
     if actual_workers <= 1 or episodes <= 1:
-        shard = _generate_shard(0, episodes, seed, len(default_bots()), {})
+        shard = _generate_shard_for_bots(0, episodes, seed, actual_bots, {})
     else:
         chunks = _episode_chunks(episodes, actual_workers, chunk_size)
         shards = []
@@ -77,7 +98,7 @@ def generate_dataset_parallel(
                     start_episode,
                     count,
                     seed,
-                    len(default_bots()),
+                    actual_bots,
                     {},
                 )
                 for start_episode, count in chunks
@@ -113,10 +134,9 @@ def _generate_shard(
     start_episode: int,
     episodes: int,
     seed: int,
-    bot_count: int,
+    bots: list[BaseBot],
     config_overrides: dict[str, Any],
 ) -> dict[str, np.ndarray]:
-    bots = default_bots()[:bot_count]
     return _generate_shard_for_bots(start_episode, episodes, seed, bots, config_overrides)
 
 
@@ -228,6 +248,7 @@ def main() -> None:
     parser.add_argument("--episodes", type=int, default=10_000)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--out", type=Path, default=Path("rollouts/bot_dataset_v0.npz"))
+    parser.add_argument("--suite", choices=["default", "expert", "fastlevel"], default="default")
     parser.add_argument(
         "--workers",
         type=int,
@@ -236,9 +257,10 @@ def main() -> None:
     )
     parser.add_argument("--chunk-size", type=int, default=None)
     args = parser.parse_args()
+    bots = bot_suite(args.suite)
     if args.workers == 1:
         started = time.perf_counter()
-        generate_dataset(args.episodes, args.out, args.seed)
+        generate_dataset(args.episodes, args.out, args.seed, bots=bots)
         elapsed = time.perf_counter() - started
         print(f"wrote {args.out} in {elapsed:.3f}s with 1 worker")
     else:
@@ -248,6 +270,7 @@ def main() -> None:
             seed=args.seed,
             workers=args.workers,
             chunk_size=args.chunk_size,
+            bots=bots,
         )
         print(
             f"wrote {args.out} in {metrics['elapsed_sec']:.3f}s with "

@@ -13,6 +13,32 @@ Use three data sources over time:
 Do not wait for real game data. It is optional and mostly useful for realism or
 human imitation later.
 
+## Bot Suites
+
+`generate_bot_dataset.py` supports named bot suites:
+
+| Suite | Contents | Main use |
+| --- | --- | --- |
+| `default` | random, greedy, economy, reroll, fast-level, and trait-commit bots | broad offline/debug data |
+| `fastlevel` | only `FastLevelBot` | high-signal imitation teacher |
+| `expert` | `FastLevelBot`, `TraitCommitBot[glacial]`, `TraitCommitBot[ranger]` | mixed stronger-policy coverage |
+
+Examples:
+
+```bash
+uv run python -m mini_tft.tools.generate_bot_dataset \
+  --suite default \
+  --episodes 1000 \
+  --workers 0 \
+  --out rollouts/default_1k.npz
+
+uv run python -m mini_tft.tools.generate_bot_dataset \
+  --suite fastlevel \
+  --episodes 5000 \
+  --workers 0 \
+  --out rollouts/fastlevel_bc_5k.npz
+```
+
 ## Transition Schema
 
 Each transition should save:

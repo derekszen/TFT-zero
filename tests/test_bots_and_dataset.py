@@ -14,7 +14,11 @@ from mini_tft.core.actions import NUM_ACTIONS
 from mini_tft.core.config import EnvConfig
 from mini_tft.rl.dataset import load_dataset
 from mini_tft.rl.gym_env import MiniTFTGymEnv
-from mini_tft.tools.generate_bot_dataset import generate_dataset, generate_dataset_parallel
+from mini_tft.tools.generate_bot_dataset import (
+    bot_suite,
+    generate_dataset,
+    generate_dataset_parallel,
+)
 
 
 def test_each_bot_runs_one_episode_without_illegal_actions() -> None:
@@ -60,3 +64,17 @@ def test_generate_and_load_parallel_dataset(tmp_path) -> None:
     assert dataset.actions.shape[0] == dataset.obs.shape[0]
     assert dataset.masks.shape[1] == NUM_ACTIONS
     assert dataset.dones.sum() == 4
+
+
+def test_named_bot_suites_generate_expected_teachers() -> None:
+    default_names = [bot.name for bot in bot_suite("default")]
+    expert_names = [bot.name for bot in bot_suite("expert")]
+    fastlevel_names = [bot.name for bot in bot_suite("fastlevel")]
+
+    assert "FastLevelBot" in default_names
+    assert expert_names == [
+        "FastLevelBot",
+        "TraitCommitBot[glacial]",
+        "TraitCommitBot[ranger]",
+    ]
+    assert fastlevel_names == ["FastLevelBot"]
