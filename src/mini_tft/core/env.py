@@ -79,6 +79,7 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
         action = int(action)
         mask = self.action_masks()
         legal = 0 <= action < len(mask) and bool(mask[action])
+        auto_end_turn = False
         reward = action_reward(action == Action.END_TURN)
 
         if legal:
@@ -87,6 +88,13 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
             state.total_illegal_actions += 1
             reward += illegal_action_reward()
 
+        if action != Action.END_TURN and not state.done:
+            state.round_action_count += 1
+            if state.round_action_count >= self.config.max_actions_per_round:
+                auto_end_turn = True
+                reward -= 0.05
+                reward += self._end_turn()
+
         state.step_count += 1
         if state.step_count >= self.config.max_steps_per_episode and not state.done:
             state.done = True
@@ -94,7 +102,13 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
 
         terminated = state.done and state.final_reason in {"hp_zero", "max_round"}
         truncated = state.done and state.final_reason == "max_steps"
-        return self._observe(), float(reward), terminated, truncated, self._info(legal_action=legal)
+        return (
+            self._observe(),
+            float(reward),
+            terminated,
+            truncated,
+            self._info(legal_action=legal, auto_end_turn=auto_end_turn),
+        )
 
     def action_masks(self) -> NDArray[np.bool_]:
         state = self._require_state()
@@ -228,7 +242,7 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
         else:
             state.round += 1
 
-        return end_turn_reward(
+        reward = end_turn_reward(
             won=result.won,
             damage=result.damage,
             board_strength_delta=result.my_strength - previous_strength,
@@ -236,20 +250,28 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
             survived_max_round=survived_max_round,
             hp=state.hp,
         )
+        state.round_action_count = 0
+        return reward
 
     def _observe(self) -> NDArray[np.float32]:
         return featurize_state(self._require_state(), self.data, self.config)
 
-    def _info(self, legal_action: bool | None = None) -> dict[str, Any]:
+    def _info(
+        self,
+        legal_action: bool | None = None,
+        auto_end_turn: bool = False,
+    ) -> dict[str, Any]:
         state = self._require_state()
         info: dict[str, Any] = {
             "action_mask": self.action_masks(),
             "round": state.round,
+            "round_action_count": state.round_action_count,
             "hp": state.hp,
             "gold": state.gold,
             "level": state.level,
             "board_strength": board_strength(state.board, self.data).strength,
             "final_reason": state.final_reason,
+            "auto_end_turn": auto_end_turn,
         }
         if legal_action is not None:
             info["legal_action"] = legal_action

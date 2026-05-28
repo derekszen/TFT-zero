@@ -79,3 +79,24 @@ def test_explicit_placement_action_moves_unit_from_bench_to_board() -> None:
     assert env.state.board[0].unit_id == unit_id
     assert env.state.bench[0] is None
     assert env.state.step_count == 2
+
+
+def test_max_actions_per_round_auto_ends_turn() -> None:
+    env = MiniTFTEnv(EnvConfig(seed=12, starting_gold=20, max_actions_per_round=2))
+    env.reset(seed=12)
+
+    _, _, terminated, truncated, info = env.step(Action.ROLL)
+
+    assert not terminated
+    assert not truncated
+    assert info["round"] == 1
+    assert info["round_action_count"] == 1
+    assert info["auto_end_turn"] is False
+
+    _, _, terminated, truncated, info = env.step(Action.ROLL)
+
+    assert not terminated
+    assert not truncated
+    assert info["round"] == 2
+    assert info["round_action_count"] == 0
+    assert info["auto_end_turn"] is True

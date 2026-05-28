@@ -13,6 +13,7 @@ class EnvConfig:
     seed: int | None = None
     max_round: int = 36
     max_steps_per_episode: int = 1_000
+    max_actions_per_round: int = 20
     starting_hp: int = 100
     starting_gold: int = 0
     starting_level: int = 3

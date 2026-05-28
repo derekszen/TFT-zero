@@ -31,6 +31,7 @@ class GameState:
     item_bench: list[int]
     done: bool = False
     step_count: int = 0
+    round_action_count: int = 0
     final_reason: str | None = None
     last_board_strength: float = 0.0
     last_enemy_strength: float = 0.0
@@ -75,6 +76,7 @@ def state_signature(state: GameState) -> tuple[object, ...]:
         tuple(state.item_bench),
         state.done,
         state.step_count,
+        state.round_action_count,
         state.final_reason,
     )
 
