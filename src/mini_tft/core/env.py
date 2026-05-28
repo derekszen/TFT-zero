@@ -147,12 +147,12 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
         if Action.SELL_BENCH_0 <= action <= Action.SELL_BENCH_8:
             return self._sell_bench(action - SELL_BENCH_OFFSET)
         if action == Action.FIELD_BEST_BOARD:
-            return 0.02 if field_best_board(self._require_state(), self.data, self.config) else 0.0
+            return 0.08 if field_best_board(self._require_state(), self.data, self.config) else 0.0
         if action == Action.SLAM_BEST_ITEM:
             return 0.02 if slam_best_item(self._require_state(), self.data, self.config) else 0.0
         if is_move_bench_to_board_action(action):
             bench_index, board_index = decode_move_bench_to_board_action(action)
-            return 0.01 if self._move_bench_to_board(bench_index, board_index) else 0.0
+            return 0.05 if self._move_bench_to_board(bench_index, board_index) else 0.0
         if is_move_board_to_bench_action(action):
             board_index, bench_index = decode_move_board_to_bench_action(action)
             return 0.01 if self._move_board_to_bench(board_index, bench_index) else 0.0
@@ -176,7 +176,7 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
             self.config.max_level,
         )
         state.total_xp_buys += 1
-        return 0.05 if state.level > previous_level else 0.0
+        return 0.01 if state.level > previous_level else 0.0
 
     def _buy_shop(self, shop_index: int) -> float:
         state = self._require_state()
@@ -189,7 +189,7 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
         state.shop[shop_index] = EMPTY
         state.total_units_bought += 1
         auto_combine(state)
-        return 0.01
+        return 0.06
 
     def _sell_bench(self, bench_index: int) -> float:
         state = self._require_state()
@@ -222,6 +222,7 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
 
     def _end_turn(self) -> float:
         state = self._require_state()
+        combat_round = state.round
         previous_strength = state.last_board_strength
         result = resolve_combat(state.board, state.round, self.data, self.config, self.rng)
         state.last_board_strength = result.my_strength
@@ -242,6 +243,7 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
         else:
             state.round += 1
 
+        board_units = sum(unit is not None for unit in state.board)
         reward = end_turn_reward(
             won=result.won,
             damage=result.damage,
@@ -250,6 +252,10 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
             survived_max_round=survived_max_round,
             hp=state.hp,
         )
+        if combat_round > 1 and board_units == 0:
+            reward -= 1.0
+        elif board_units > 0:
+            reward += min(result.my_strength * 0.002, 0.4)
         state.round_action_count = 0
         return reward
 

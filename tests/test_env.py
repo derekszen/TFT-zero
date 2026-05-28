@@ -100,3 +100,29 @@ def test_max_actions_per_round_auto_ends_turn() -> None:
     assert info["round"] == 2
     assert info["round_action_count"] == 0
     assert info["auto_end_turn"] is True
+
+
+def test_buy_xp_requires_owned_unit() -> None:
+    env = MiniTFTEnv(EnvConfig(seed=13, starting_gold=8))
+    env.reset(seed=13)
+
+    assert not env.action_masks()[Action.BUY_XP]
+
+    buy_action = next(
+        action
+        for action, legal in enumerate(env.action_masks())
+        if legal and Action.BUY_SHOP_0 <= action <= Action.BUY_SHOP_4
+    )
+    env.step(buy_action)
+
+    assert env.action_masks()[Action.BUY_XP]
+
+
+def test_empty_board_end_turn_after_opening_is_penalized() -> None:
+    env = MiniTFTEnv(EnvConfig(seed=14))
+    env.reset(seed=14)
+
+    _, opening_reward, _, _, _ = env.step(Action.END_TURN)
+    _, empty_board_reward, _, _, _ = env.step(Action.END_TURN)
+
+    assert empty_board_reward < opening_reward - 0.5

@@ -30,8 +30,14 @@ def legal_action_mask(
         return mask
 
     mask[Action.END_TURN] = True
+    board_count = sum(unit is not None for unit in state.board)
+    has_owned_unit = board_count > 0 or any(unit is not None for unit in state.bench)
     mask[Action.ROLL] = state.gold >= config.roll_cost
-    mask[Action.BUY_XP] = state.gold >= config.xp_buy_cost and state.level < config.max_level
+    mask[Action.BUY_XP] = (
+        state.gold >= config.xp_buy_cost
+        and state.level < config.max_level
+        and has_owned_unit
+    )
 
     has_bench_space = any(slot is None for slot in state.bench)
     for shop_index, unit_id in enumerate(state.shop):
@@ -54,7 +60,6 @@ def legal_action_mask(
     )
     mask[Action.SLAM_BEST_ITEM] = has_item and has_target
 
-    board_count = sum(unit is not None for unit in state.board)
     has_board_room = board_count < state.level
     for bench_index, unit in enumerate(state.bench):
         if unit is None:
