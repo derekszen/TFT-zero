@@ -13,11 +13,17 @@ REQUIRED_GAP_FIXTURES = {
     "six_noble_capped_board_beats_high_cost_goodstuff",
 }
 
+REQUIRED_ASSASSIN_FIXTURES = {
+    "assassin_pair_challenges_ranger_backline",
+    "itemized_assassin_carry_beats_front_to_back_item_stack",
+    "assassin_pressure_shell_beats_same_roles_without_access",
+}
+
 
 def test_combat_eval_reports_all_fixtures() -> None:
     report = run_combat_eval(benchmark_iters=1)
 
-    assert 14 <= report["total"] <= 20
+    assert 14 <= report["total"] <= 24
     assert len(report["fixtures"]) == report["total"]
     assert report["benchmark"]["calls"] == report["total"] * 2
     assert report["passed"] <= report["total"]
@@ -50,6 +56,18 @@ def test_combat_eval_closes_known_v2_gap_fixtures() -> None:
         assert row["margin"] >= row["min_margin"]
 
 
+def test_combat_eval_closes_assassin_pressure_fixtures() -> None:
+    report = run_combat_eval(benchmark_iters=0)
+    rows = {row["name"]: row for row in report["fixtures"]}
+
+    assert REQUIRED_ASSASSIN_FIXTURES <= rows.keys()
+    for name in REQUIRED_ASSASSIN_FIXTURES:
+        row = rows[name]
+        assert row["category"] == "assassin_pressure"
+        assert row["status"] == "pass", row
+        assert row["margin"] >= row["min_margin"]
+
+
 def test_combat_fixture_suite_covers_core_categories() -> None:
     fixtures = combat_fixtures()
     categories = {fixture.category for fixture in fixtures}
@@ -61,6 +79,7 @@ def test_combat_fixture_suite_covers_core_categories() -> None:
         "item_fit",
         "trait_role",
         "late_game_scaling",
+        "assassin_pressure",
     }
     assert all(fixture.weight > 0 for fixture in fixtures)
     assert len(names) == len(fixtures)

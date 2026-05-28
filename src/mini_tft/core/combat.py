@@ -35,6 +35,9 @@ TRAIT_BREAKPOINT_FLAT_BONUS = {
     ("ranger", 2): 5.0,
     ("noble", 6): 35.0,
 }
+ASSASSIN_PRESSURE_POWER_RATIO = 0.14
+ASSASSIN_PAIR_ACCESS_BONUS = 3.75
+ASSASSIN_PRESSURE_CAP = 8.0
 
 
 @dataclass(frozen=True)
@@ -65,6 +68,8 @@ def board_strength(board: list[UnitInstance | None], data: GameData) -> CombatSt
     item_enemy_penalty = 0.0
     item_fit_power = 0.0
     upgrade_bonus = 0.0
+    assassin_count = 0
+    assassin_power = 0.0
     unit_ids: set[int] = set()
 
     for slot_index, unit in enumerate(board):
@@ -88,6 +93,9 @@ def board_strength(board: list[UnitInstance | None], data: GameData) -> CombatSt
         role_power[unit_def.role] += positioned_power
         role_counts[unit_def.role] += 1
         upgrade_bonus += _upgrade_reliability_bonus(unit, data)
+        if "assassin" in unit_def.traits:
+            assassin_count += 1
+            assassin_power += positioned_power
 
     carry_multiplier = 1.0
     tank_multiplier = 1.0
@@ -112,6 +120,7 @@ def board_strength(board: list[UnitInstance | None], data: GameData) -> CombatSt
         + item_fit_power
         + _board_balance_bonus(role_power)
         + _skirmish_structure_bonus(role_power, role_counts)
+        + _assassin_pressure_bonus(assassin_count, assassin_power, role_power)
         + _trait_breakpoint_bonus(counts, data)
         + upgrade_bonus
     )
@@ -205,6 +214,29 @@ def _skirmish_structure_bonus(role_power: dict[str, float], role_counts: dict[st
         bonus += min(support_power * 0.14, (tank_power + carry_power) * 0.06)
     if role_counts["tank"] == 0 and role_counts["carry"] >= 2:
         bonus -= 4.0
+    return bonus
+
+
+def _assassin_pressure_bonus(
+    assassin_count: int,
+    assassin_power: float,
+    role_power: dict[str, float],
+) -> float:
+    """Approximate assassin jump pressure without simulating targeting."""
+
+    if assassin_count <= 0:
+        return 0.0
+
+    bonus = min(assassin_power * ASSASSIN_PRESSURE_POWER_RATIO, ASSASSIN_PRESSURE_CAP)
+    if assassin_count >= 2:
+        bonus += ASSASSIN_PAIR_ACCESS_BONUS
+    if assassin_count >= 3:
+        bonus += min((assassin_count - 2) * 2.0, 6.0)
+
+    if role_power["tank"] <= 0.0:
+        bonus *= 0.55
+    if role_power["carry"] <= 0.0:
+        bonus *= 0.70
     return bonus
 
 

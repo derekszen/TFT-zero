@@ -228,6 +228,51 @@ def combat_fixtures() -> list[CombatFixture]:
             category="trait_role",
         ),
         CombatFixture(
+            name="assassin_pair_challenges_ranger_backline",
+            better_board=_board(
+                [_unit(20), None, None, None, _unit(11), None, _unit(14), _unit(18)]
+            ),
+            worse_board=_board(
+                [_unit(20), None, None, None, _unit(13), None, _unit(8), _unit(18)]
+            ),
+            min_margin=2.0,
+            rationale=(
+                "A Pyke/Katarina pair should add enough backline pressure to "
+                "challenge a conventional ranger backline shell."
+            ),
+            category="assassin_pressure",
+        ),
+        CombatFixture(
+            name="itemized_assassin_carry_beats_front_to_back_item_stack",
+            better_board=_board(
+                [_unit(20), None, None, None, _unit(11), None, _unit(14, items=[1, 2]), _unit(18)]
+            ),
+            worse_board=_board(
+                [_unit(20), None, None, None, _unit(16), None, _unit(15), _unit(18, items=[1, 2])]
+            ),
+            min_margin=3.0,
+            rationale=(
+                "An itemized assassin carry should gain extra value from backline "
+                "access, not score like a generic front-to-back carry."
+            ),
+            category="assassin_pressure",
+        ),
+        CombatFixture(
+            name="assassin_pressure_shell_beats_same_roles_without_access",
+            better_board=_board(
+                [_unit(20), None, None, None, _unit(11), None, _unit(14), _unit(18)]
+            ),
+            worse_board=_board(
+                [_unit(20), None, None, None, _unit(16), None, _unit(15), _unit(18)]
+            ),
+            min_margin=6.0,
+            rationale=(
+                "A balanced shell with assassin access should beat the same "
+                "frontline/carry/support shape without backline access."
+            ),
+            category="assassin_pressure",
+        ),
+        CombatFixture(
             name="six_noble_capped_board_beats_high_cost_goodstuff",
             better_board=_board(
                 [
