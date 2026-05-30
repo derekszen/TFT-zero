@@ -29,6 +29,13 @@ assets = [
   "httpx>=0.27.0",
   "pillow>=10.4.0",
 ]
+fight = [
+  "numcodecs>=0.16.5",
+  "python-dotenv>=1.2.2",
+  "torch>=2.4.0",
+  "tqdm>=4.66.0",
+  "zarr>=3.2.1",
+]
 
 [dependency-groups]
 dev = [
@@ -47,6 +54,7 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+extend-exclude = ["third_party"]
 
 [tool.ruff.lint]
 select = ["B", "E", "F", "I", "UP"]

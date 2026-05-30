@@ -124,6 +124,30 @@ Use it for:
 - rollout sanity checks
 - later planning experiments
 
+## Fight Value Model
+
+Detailed combat is now separated into a teacher-label pipeline. Generate labels
+with the vendored TFTMuZeroAgent Set 4 teacher, train `FightValueNet`, and
+benchmark GPU inference before using it inside RL:
+
+```bash
+uv run python -m mini_tft.tools.generate_fight_labels \
+  --teacher tft-muzero \
+  --target-fights 1000000 \
+  --workers 12 \
+  --shard-size 10000 \
+  --out data/fight_labels/set4_teacher_v1
+
+uv run python -m mini_tft.rl.train_fight_value_model \
+  --dataset data/fight_labels/set4_teacher_v1 \
+  --device cuda \
+  --batch-size 16384 \
+  --epochs 10 \
+  --out checkpoints/fight_value/set4_teacher_v1.pt
+```
+
+See `docs/FIGHT_VALUE_MODEL.md` for smoke commands and benchmark details.
+
 ## MuZero Later
 
 MuZero-style latent planning fits TFT-like uncertainty better than AlphaZero,

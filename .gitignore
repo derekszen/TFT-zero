@@ -17,3 +17,4 @@ rollouts/
 checkpoints/
 artifacts/
 assets/cache/
+data/fight_labels/
