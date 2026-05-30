@@ -1,0 +1,167 @@
+{
+  "source": {
+    "name": "MetaTFT current-patch comp stats",
+    "retrieved_at": "2026-05-31",
+    "queue": "1100",
+    "patch": "current",
+    "days": 3,
+    "ranks": [
+      "CHALLENGER",
+      "DIAMOND",
+      "EMERALD",
+      "GRANDMASTER",
+      "MASTER",
+      "PLATINUM"
+    ],
+    "stats_url": "https://api-hc.metatft.com/tft-comps-api/comps_stats?queue=1100&patch=current&days=3&rank=CHALLENGER,DIAMOND,EMERALD,GRANDMASTER,MASTER,PLATINUM&permit_filter_adjustment=true",
+    "cluster_url": "https://api-hc.metatft.com/tft-comps-api/latest_cluster_info",
+    "cluster_id": 409,
+    "tft_set": "TFTSet17"
+  },
+  "records": [
+    {
+      "cluster_id": "409003",
+      "name": "TFT17_ASTrait, TFT17_MissFortune, TFT17_Urgot",
+      "units": ["TFT17_Aatrox", "TFT17_Belveth", "TFT17_MissFortune", "TFT17_Maokai", "TFT17_Urgot", "TFT17_Ornn", "TFT17_Ornn", "TFT17_Rhaast", "TFT17_Kindred"],
+      "avg_placement": 4.0216,
+      "top4_rate": 0.6032,
+      "win_rate": 0.1047,
+      "count": 121645
+    },
+    {
+      "cluster_id": "409000",
+      "name": "TFT17_Augment_JaxCarry, TFT17_Pantheon",
+      "units": ["TFT17_Aatrox", "TFT17_TwistedFate", "TFT17_Jax", "TFT17_Milio", "TFT17_Pantheon", "TFT17_Maokai", "TFT17_Lulu", "TFT17_Rhaast"],
+      "avg_placement": 4.0681,
+      "top4_rate": 0.5861,
+      "win_rate": 0.1619,
+      "count": 18557
+    },
+    {
+      "cluster_id": "409001",
+      "name": "TFT17_Augment_LeonaCarry",
+      "units": ["TFT17_Leona", "TFT17_Zoe", "TFT17_IvernMinion", "TFT17_Mordekaiser", "TFT17_Illaoi", "TFT17_Karma", "TFT17_Nunu", "TFT17_Leblanc", "TFT17_Summon"],
+      "avg_placement": 4.1585,
+      "top4_rate": 0.5621,
+      "win_rate": 0.1407,
+      "count": 17620
+    },
+    {
+      "cluster_id": "409007",
+      "name": "TFT17_Augment_GragasCarry",
+      "units": ["TFT17_Chogath", "TFT17_Pyke", "TFT17_Gragas", "TFT17_Pantheon", "TFT17_Maokai", "TFT17_Urgot", "TFT17_MasterYi", "TFT17_TahmKench", "TFT17_Sona"],
+      "avg_placement": 4.1799,
+      "top4_rate": 0.5672,
+      "win_rate": 0.1054,
+      "count": 25685
+    },
+    {
+      "cluster_id": "409005",
+      "name": "TFT17_Astronaut, TFT17_Corki",
+      "units": ["TFT17_Milio", "TFT17_IvernMinion", "TFT17_Fizz", "TFT17_Rammus", "TFT17_Corki", "TFT17_Galio", "TFT17_Riven", "TFT17_Bard", "TFT17_Shen"],
+      "avg_placement": 4.2146,
+      "top4_rate": 0.5694,
+      "win_rate": 0.1034,
+      "count": 189077
+    },
+    {
+      "cluster_id": "409002",
+      "name": "TFT17_ShieldTank, TFT17_Nunu, TFT17_Illaoi",
+      "units": ["TFT17_IvernMinion", "TFT17_Mordekaiser", "TFT17_Illaoi", "TFT17_Karma", "TFT17_Nunu", "TFT17_Bard", "TFT17_Blitzcrank", "TFT17_Sona", "TFT17_Vex", "TFT17_Summon"],
+      "avg_placement": 4.2164,
+      "top4_rate": 0.5407,
+      "win_rate": 0.1882,
+      "count": 272772
+    },
+    {
+      "cluster_id": "409010",
+      "name": "TFT17_RangedTrait, TFT17_Xayah, TFT17_TahmKench",
+      "units": ["TFT17_Aatrox", "TFT17_Jax", "TFT17_Maokai", "TFT17_Rhaast", "TFT17_Nunu", "TFT17_Xayah", "TFT17_TahmKench", "TFT17_Jhin", "TFT17_Blitzcrank"],
+      "avg_placement": 4.228,
+      "top4_rate": 0.5375,
+      "win_rate": 0.1945,
+      "count": 200171
+    },
+    {
+      "cluster_id": "409008",
+      "name": "TFT17_ManaTrait, TFT17_MissFortune, TFT17_Ornn",
+      "units": ["TFT17_Aatrox", "TFT17_Gragas", "TFT17_MissFortune", "TFT17_Maokai", "TFT17_Viktor", "TFT17_Ornn", "TFT17_Rhaast", "TFT17_Bard"],
+      "avg_placement": 4.2928,
+      "top4_rate": 0.5459,
+      "win_rate": 0.0866,
+      "count": 32696
+    },
+    {
+      "cluster_id": "409060",
+      "name": "TFT17_ADMIN, TFT17_Diana",
+      "units": ["TFT17_Leona", "TFT17_Jinx", "TFT17_IvernMinion", "TFT17_Illaoi", "TFT17_Diana", "TFT17_Nunu", "TFT17_Leblanc", "TFT17_TahmKench", "TFT17_Summon"],
+      "avg_placement": 5.1474,
+      "top4_rate": 0.3745,
+      "win_rate": 0.0576,
+      "count": 15512
+    },
+    {
+      "cluster_id": "409059",
+      "name": "TFT17_Timebreaker, TFT17_Pantheon",
+      "units": ["TFT17_Ezreal", "TFT17_Chogath", "TFT17_Milio", "TFT17_Pantheon", "TFT17_Maokai", "TFT17_Riven", "TFT17_TahmKench", "TFT17_Jhin"],
+      "avg_placement": 5.1587,
+      "top4_rate": 0.3787,
+      "win_rate": 0.0528,
+      "count": 13836
+    },
+    {
+      "cluster_id": "409063",
+      "name": "TFT17_PsyOps, TFT17_Viktor",
+      "units": ["TFT17_Pyke", "TFT17_Gragas", "TFT17_Maokai", "TFT17_Viktor", "TFT17_Karma", "TFT17_MasterYi", "TFT17_TahmKench", "TFT17_Fiora", "TFT17_Sona"],
+      "avg_placement": 5.292,
+      "top4_rate": 0.3407,
+      "win_rate": 0.0308,
+      "count": 14982
+    },
+    {
+      "cluster_id": "409061",
+      "name": "TFT17_Stargazer_Mountain, TFT17_Lulu",
+      "units": ["TFT17_IvernMinion", "TFT17_Mordekaiser", "TFT17_Illaoi", "TFT17_Lulu", "TFT17_Karma", "TFT17_Nunu", "TFT17_Nunu", "TFT17_Bard", "TFT17_Blitzcrank"],
+      "avg_placement": 5.3653,
+      "top4_rate": 0.3319,
+      "win_rate": 0.0444,
+      "count": 12038
+    },
+    {
+      "cluster_id": "409064",
+      "name": "TFT17_HPTank, TFT17_Maokai",
+      "units": ["TFT17_Gragas", "TFT17_Maokai", "TFT17_Urgot", "TFT17_TahmKench", "TFT17_Bard", "TFT17_Fiora", "TFT17_Jhin", "TFT17_Blitzcrank", "TFT17_Sona", "TFT17_Vex", "TFT17_Graves"],
+      "avg_placement": 5.3727,
+      "top4_rate": 0.3357,
+      "win_rate": 0.0745,
+      "count": 12275
+    },
+    {
+      "cluster_id": "409066",
+      "name": "TFT17_AnimaSquad, TFT17_Aurora",
+      "units": ["TFT17_Briar", "TFT17_Jinx", "TFT17_Mordekaiser", "TFT17_Illaoi", "TFT17_Aurora", "TFT17_Karma", "TFT17_Nunu", "TFT17_TahmKench", "TFT17_Fiora"],
+      "avg_placement": 5.7484,
+      "top4_rate": 0.2806,
+      "win_rate": 0.1348,
+      "count": 17564
+    },
+    {
+      "cluster_id": "409065",
+      "name": "TFT17_ShieldTank, TFT17_Leona",
+      "units": ["TFT17_Nasus", "TFT17_Leona", "TFT17_IvernMinion", "TFT17_Mordekaiser", "TFT17_Illaoi", "TFT17_Karma", "TFT17_Nunu", "TFT17_Bard", "TFT17_Blitzcrank", "TFT17_Sona", "TFT17_Vex", "TFT17_Summon"],
+      "avg_placement": 5.7892,
+      "top4_rate": 0.2565,
+      "win_rate": 0.0393,
+      "count": 30575
+    },
+    {
+      "cluster_id": "409068",
+      "name": "TFT17_AnimaSquad, TFT17_Jinx",
+      "units": ["TFT17_Jinx", "TFT17_IvernMinion", "TFT17_Illaoi", "TFT17_Karma", "TFT17_Nunu", "TFT17_Bard", "TFT17_Blitzcrank", "TFT17_Sona", "TFT17_Vex", "TFT17_Summon"],
+      "avg_placement": 6.2665,
+      "top4_rate": 0.2091,
+      "win_rate": 0.0765,
+      "count": 19615
+    }
+  ]
+}

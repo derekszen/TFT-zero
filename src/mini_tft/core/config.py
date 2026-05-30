@@ -31,4 +31,7 @@ class EnvConfig:
     win_gold: int = 1
     combat_noise_std: float = 3.0
     combat_sigmoid_scale: float = 12.0
+    combat_model: str = "abstract"
+    fight_value_checkpoint: str | None = None
+    fight_value_device: str = "cpu"
     item_drop_interval: int = 4

@@ -148,6 +148,40 @@ uv run python -m mini_tft.rl.train_fight_value_model \
 
 See `docs/FIGHT_VALUE_MODEL.md` for smoke commands and benchmark details.
 
+The learned fight path is now wired behind `EnvConfig(combat_model="fight_value")`,
+but it should stay out of RL rewards/search until:
+
+```bash
+uv run python -m mini_tft.tools.calibrate_fight_value_model \
+  --checkpoint checkpoints/fight_value/set4_teacher_v1.pt \
+  --fixture tests/fixtures/metatft_set17_comp_strength_2026-05-31.json \
+  --device cuda \
+  --fail-on-threshold
+```
+
+passes against real comp ranking data.
+
+The Set 4 teacher checkpoint is intentionally treated as stale for current-patch
+MetaTFT work. To adapt the value model to the current patch, fetch a MetaTFT
+aggregate snapshot and train the current-patch ranking adapter:
+
+```bash
+uv run python -m mini_tft.tools.fetch_metatft_comp_strength \
+  --out data/metatft/current_comp_strength.json \
+  --min-count 3000
+
+uv run python -m mini_tft.rl.train_metatft_fight_value_model \
+  --train-fixture data/metatft/current_comp_strength.json \
+  --eval-fixture tests/fixtures/metatft_set17_comp_strength_2026-05-31.json \
+  --device cuda \
+  --epochs 4000 \
+  --out checkpoints/fight_value/metatft_current_patch.pt
+```
+
+That current-patch checkpoint is a MetaTFT comp ranker, not a drop-in MiniTFT
+combat model. `MiniTFTEnv` rejects it until the simulator uses the same
+current-patch unit namespace.
+
 ## MuZero Later
 
 MuZero-style latent planning fits TFT-like uncertainty better than AlphaZero,

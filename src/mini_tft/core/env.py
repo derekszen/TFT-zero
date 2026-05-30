@@ -20,7 +20,7 @@ from mini_tft.core.actions import (
     is_move_board_to_bench_action,
 )
 from mini_tft.core.board import field_best_board
-from mini_tft.core.combat import board_strength, resolve_combat
+from mini_tft.core.combat import CombatResult, board_strength, resolve_combat
 from mini_tft.core.config import EnvConfig
 from mini_tft.core.economy import apply_xp, income_after_combat, sell_value
 from mini_tft.core.featurize import OBS_CLIP_HIGH, OBS_CLIP_LOW, featurize_state, observation_dim
@@ -32,6 +32,10 @@ from mini_tft.core.set_data import GameData, load_set
 from mini_tft.core.shop import sample_shop
 from mini_tft.core.state import GameState, UnitInstance, new_game_state
 from mini_tft.core.upgrades import auto_combine
+from mini_tft.fight_model.simulator_adapter import (
+    FightValueCombatModel,
+    resolve_combat_with_fight_value,
+)
 
 
 class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
@@ -44,6 +48,7 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
         self.data: GameData = load_set(self.config.dataset)
         self.rng = np.random.default_rng(self.config.seed)
         self.state: GameState | None = None
+        self.fight_value_model: FightValueCombatModel | None = self._load_fight_value_model()
         self.action_space = spaces.Discrete(NUM_ACTIONS)
         self.observation_space = spaces.Box(
             low=OBS_CLIP_LOW,
@@ -125,7 +130,7 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
             "final_hp": state.hp,
             "survived_round": min(state.round, self.config.max_round),
             "survival_rate": state.round > self.config.max_round,
-            "final_board_strength": board_strength(state.board, self.data).strength,
+            "final_board_strength": self._board_value(state),
             "total_rolls": state.total_rolls,
             "total_xp_buys": state.total_xp_buys,
             "total_units_bought": state.total_units_bought,
@@ -224,7 +229,7 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
         state = self._require_state()
         combat_round = state.round
         previous_strength = state.last_board_strength
-        result = resolve_combat(state.board, state.round, self.data, self.config, self.rng)
+        result = self._resolve_combat(state)
         state.last_board_strength = result.my_strength
         state.last_enemy_strength = result.enemy_strength
         state.last_win = result.won
@@ -275,7 +280,8 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
             "hp": state.hp,
             "gold": state.gold,
             "level": state.level,
-            "board_strength": board_strength(state.board, self.data).strength,
+            "board_strength": self._board_value(state),
+            "combat_model": self.config.combat_model,
             "final_reason": state.final_reason,
             "auto_end_turn": auto_end_turn,
         }
@@ -287,3 +293,47 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
         if self.state is None:
             raise RuntimeError("Call reset() before using the environment.")
         return self.state
+
+    def _resolve_combat(self, state: GameState) -> CombatResult:
+        if self.config.combat_model == "abstract":
+            return resolve_combat(state.board, state.round, self.data, self.config, self.rng)
+        if self.config.combat_model == "fight_value":
+            if self.fight_value_model is None:
+                raise RuntimeError("fight_value combat selected without a loaded evaluator")
+            return resolve_combat_with_fight_value(
+                state.board,
+                state.round,
+                self.data,
+                self.config,
+                self.rng,
+                self.fight_value_model,
+            )
+        raise ValueError(f"unsupported combat_model: {self.config.combat_model}")
+
+    def _board_value(self, state: GameState) -> float:
+        if self.config.combat_model == "fight_value" and self.fight_value_model is not None:
+            return self.fight_value_model.predict_mini_board(
+                state.board,
+                state.round,
+                self.data,
+                self.config,
+            ).learned_strength
+        return board_strength(state.board, self.data).strength
+
+    def _load_fight_value_model(self) -> FightValueCombatModel | None:
+        if self.config.combat_model == "abstract":
+            return None
+        if self.config.combat_model != "fight_value":
+            raise ValueError(f"unsupported combat_model: {self.config.combat_model}")
+        if not self.config.fight_value_checkpoint:
+            raise ValueError("fight_value combat_model requires fight_value_checkpoint")
+        evaluator = FightValueCombatModel(
+            self.config.fight_value_checkpoint,
+            device_name=self.config.fight_value_device,
+        )
+        if evaluator.metatft_unit_id_lookup is not None:
+            raise ValueError(
+                "MetaTFT current-patch fight value checkpoints cannot be used with "
+                "MiniTFTEnv until the simulator state uses the same unit namespace"
+            )
+        return evaluator

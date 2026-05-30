@@ -163,9 +163,16 @@ def checkpoint_payload(
 
 
 def load_checkpoint(path: Path, map_location: str | torch.device = "cpu") -> FightValueNet:
-    payload = torch.load(path, map_location=map_location)
+    payload = load_checkpoint_payload(path, map_location=map_location)
     config = FightModelConfig(**payload["config"])
     model = FightValueNet(config)
     model.load_state_dict(payload["model_state"])
     model.eval()
     return model
+
+
+def load_checkpoint_payload(
+    path: Path,
+    map_location: str | torch.device = "cpu",
+) -> dict[str, Any]:
+    return torch.load(path, map_location=map_location)
