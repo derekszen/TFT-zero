@@ -1,0 +1,66 @@
+"""Current-patch MetaTFT catalog, state, and encoder utilities."""
+
+from mini_tft.metatft.catalog import (
+    CatalogAugment,
+    CatalogItem,
+    CatalogMetadata,
+    CatalogTag,
+    CatalogTrait,
+    CatalogUnit,
+    CompStageLine,
+    MetaTFTCatalog,
+    MetaTFTComp,
+    TraitBreakpoint,
+    UnitItemBuild,
+    build_catalog_from_comp_records,
+    load_catalog_from_comp_strength,
+    load_catalog_from_payload,
+)
+from mini_tft.metatft.encoders import (
+    STAGE_LINE_SPECS,
+    CurrentBoardEncoder,
+    EncodedBoardState,
+    EncodedStageLine,
+    derive_stage_line_states,
+    final_board_state,
+)
+from mini_tft.metatft.schema import CurrentBoardState, CurrentBoardUnit
+from mini_tft.metatft.value_training import (
+    BoardValueBatch,
+    CurrentPatchValueConfig,
+    CurrentPatchValueNet,
+    CurrentPatchValueTrainReport,
+    build_value_training_batch,
+    train_current_patch_value_model,
+)
+
+__all__ = [
+    "CatalogMetadata",
+    "CatalogAugment",
+    "CatalogItem",
+    "CatalogTag",
+    "CatalogTrait",
+    "CatalogUnit",
+    "CompStageLine",
+    "CurrentBoardEncoder",
+    "CurrentBoardState",
+    "CurrentBoardUnit",
+    "CurrentPatchValueConfig",
+    "CurrentPatchValueNet",
+    "CurrentPatchValueTrainReport",
+    "EncodedBoardState",
+    "EncodedStageLine",
+    "MetaTFTCatalog",
+    "MetaTFTComp",
+    "STAGE_LINE_SPECS",
+    "TraitBreakpoint",
+    "UnitItemBuild",
+    "BoardValueBatch",
+    "build_catalog_from_comp_records",
+    "build_value_training_batch",
+    "derive_stage_line_states",
+    "final_board_state",
+    "load_catalog_from_comp_strength",
+    "load_catalog_from_payload",
+    "train_current_patch_value_model",
+]

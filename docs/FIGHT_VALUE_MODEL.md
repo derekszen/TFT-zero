@@ -139,3 +139,7 @@ unit namespace. They are valid for MetaTFT comp ranking/calibration, but they
 are rejected by `MiniTFTEnv` until the simulator state is also current-patch and
 uses the same unit-name mapping. This prevents Set 1-style integer unit IDs from
 being scored as unrelated current-patch units.
+
+See `docs/CURRENT_PATCH_METATFT.md` for the normalized catalog,
+`CurrentBoardState`, and final/stage-line encoder path that will feed the
+current-patch value/planning model.
