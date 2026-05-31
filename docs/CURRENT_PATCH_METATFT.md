@@ -211,6 +211,8 @@ MetaTFT comps with multiset unit overlap:
 - `exact_match`: whether the final board exactly matches the target top-comp
   board at that level
 - `partial_match`: whether recall is at or above `--min-recall`, default `0.75`
+- `good_enough`: whether `exact_match` is true or recall is at least
+  `--min-recall`
 - `precision`, `recall`, and `jaccard`: overlap quality against the best top-k
   comp match
 
@@ -224,4 +226,27 @@ uv run python -m mini_tft.tools.plan_current_patch_turn \
   --demo-level 8 \
   --match-levels 8,9 \
   --top-k 10
+```
+
+For many fixed comp IDs, use the batch evaluator:
+
+```bash
+uv run python -m mini_tft.tools.evaluate_current_patch_planner \
+  --catalog data/metatft/current_rich_catalog.json \
+  --checkpoint checkpoints/fight_value/current_patch_board_value.pt \
+  --device cuda \
+  --comp-limit 16 \
+  --demo-levels 8,9 \
+  --match-levels 8,9 \
+  --top-k 10 \
+  --min-recall 0.75 \
+  --out runs/current_patch_planner_eval.json
+```
+
+The batch report summarizes per-level `exact_match_rate`,
+`partial_match_rate`, `good_enough_rate`, and `eligible_good_enough_rate`.
+Current default threshold:
+
+```text
+good_enough = eligible and (exact_match or recall >= 0.75)
 ```

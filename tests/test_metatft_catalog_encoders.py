@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -14,10 +15,12 @@ from mini_tft.metatft import (
     CurrentBoardUnit,
     CurrentPatchPlannerScorer,
     CurrentPatchShopEconPolicy,
+    PolicyTurnPlan,
     ScoredTransition,
     ShopEconPolicyConfig,
     build_shop_bench_board_transitions,
     derive_stage_line_states,
+    evaluate_planner_trace_batch,
     final_board_state,
     load_catalog_from_comp_strength,
     load_catalog_from_payload,
@@ -421,6 +424,38 @@ def test_top_comp_match_report_marks_underleveled_traces_ineligible() -> None:
     assert all(match.exact_match is False for match in report)
 
 
+def test_planner_trace_batch_summarizes_level_8_and_9_match_rates() -> None:
+    catalog = load_catalog_from_comp_strength(FIXTURE)
+    report = evaluate_planner_trace_batch(
+        catalog,
+        _FinalCompPlanner(catalog),
+        comp_ids=("409003", "409000"),
+        demo_levels=(8, 9),
+        match_levels=(8, 9),
+        top_k=16,
+        min_recall=0.75,
+    )
+
+    assert report.comp_ids == ("409003", "409000")
+    assert len(report.traces) == 4
+    assert [summary.level for summary in report.summaries] == [8, 9]
+
+    level_8 = report.summaries[0]
+    assert level_8.trace_count == 4
+    assert level_8.eligible_count == 4
+    assert level_8.exact_match_count == _count_matches(report.traces, 8, "exact_match")
+    assert level_8.good_enough_count == 4
+    assert level_8.good_enough_rate == pytest.approx(1.0)
+
+    level_9 = report.summaries[1]
+    assert level_9.trace_count == 4
+    assert level_9.eligible_count == 2
+    assert level_9.exact_match_count == _count_matches(report.traces, 9, "exact_match")
+    assert level_9.good_enough_count == _count_matches(report.traces, 9, "good_enough")
+    assert level_9.good_enough_rate == pytest.approx(0.5)
+    assert level_9.eligible_good_enough_rate == pytest.approx(1.0)
+
+
 class _TypePriorityScorer:
     priorities = {
         "field_bench": 100.0,
@@ -467,6 +502,40 @@ class _TypePriorityScorer:
             )
             for index, row in enumerate(scored)
         )
+
+
+class _FinalCompPlanner:
+    def __init__(self, catalog) -> None:
+        self.catalog = catalog
+
+    def plan_turn(
+        self,
+        state: CurrentBoardState,
+        *,
+        shops,
+        unit_costs=None,
+        rank_by: str = "after_value",
+    ) -> PolicyTurnPlan:
+        del shops, unit_costs, rank_by
+        comp = self.catalog.comp(state.target_comp_id)
+        final_state = replace(
+            state,
+            board=tuple(
+                CurrentBoardUnit(unit_key=unit_key, position=index)
+                for index, unit_key in enumerate(comp.unit_keys[: state.level])
+            ),
+            bench=(),
+        )
+        return PolicyTurnPlan(decisions=(), final_state=final_state, final_shop=(), stopped=True)
+
+
+def _count_matches(traces, level: int, field: str) -> int:
+    return sum(
+        1
+        for trace in traces
+        for match in trace.matches
+        if match.level == level and getattr(match, field)
+    )
 
 
 def _fixture_source_records() -> tuple[dict[str, object], list[dict[str, object]]]:

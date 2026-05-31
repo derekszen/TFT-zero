@@ -25,6 +25,7 @@ class TopCompMatch:
     jaccard: float
     exact_match: bool
     partial_match: bool
+    good_enough: bool
     missing_units: tuple[str, ...]
     extra_units: tuple[str, ...]
 
@@ -122,6 +123,7 @@ def _score_comp_match(
     extra = _expanded_counter(board_counts - target_counts)
     exact = eligible and not missing and not extra
     partial = eligible and recall >= min_recall
+    good_enough = exact or partial
     return TopCompMatch(
         level=level,
         top_k=top_k,
@@ -137,6 +139,7 @@ def _score_comp_match(
         jaccard=jaccard,
         exact_match=exact,
         partial_match=partial,
+        good_enough=good_enough,
         missing_units=missing,
         extra_units=extra,
     )

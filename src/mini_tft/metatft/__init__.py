@@ -31,6 +31,13 @@ from mini_tft.metatft.planner import (
     ScoredTransition,
     build_shop_bench_board_transitions,
 )
+from mini_tft.metatft.planner_evaluation import (
+    PlannerBatchEvaluation,
+    PlannerLevelMatchSummary,
+    PlannerTraceEvaluation,
+    demo_state_and_shops,
+    evaluate_planner_trace_batch,
+)
 from mini_tft.metatft.policy import (
     CurrentPatchShopEconPolicy,
     PolicyTurnPlan,
@@ -70,6 +77,9 @@ __all__ = [
     "EncodedStageLine",
     "MetaTFTCatalog",
     "MetaTFTComp",
+    "PlannerBatchEvaluation",
+    "PlannerLevelMatchSummary",
+    "PlannerTraceEvaluation",
     "PolicyTurnPlan",
     "ScoredTransition",
     "ShopEconPolicyConfig",
@@ -81,7 +91,9 @@ __all__ = [
     "build_catalog_from_comp_records",
     "build_shop_bench_board_transitions",
     "build_value_training_batch",
+    "demo_state_and_shops",
     "derive_stage_line_states",
+    "evaluate_planner_trace_batch",
     "final_board_state",
     "load_catalog_from_comp_strength",
     "load_catalog_from_payload",

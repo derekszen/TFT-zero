@@ -8,10 +8,9 @@ from dataclasses import asdict
 from pathlib import Path
 
 from mini_tft.metatft import (
-    CurrentBoardState,
-    CurrentBoardUnit,
     CurrentPatchShopEconPolicy,
     ShopEconPolicyConfig,
+    demo_state_and_shops,
     load_catalog_from_comp_strength,
     top_comp_match_report,
 )
@@ -32,7 +31,7 @@ def main() -> None:
 
     catalog = load_catalog_from_comp_strength(args.catalog)
     comp = catalog.comp(args.comp_id) if args.comp_id else catalog.comps[0]
-    state, shops = _demo_state_and_shops(
+    state, shops = demo_state_and_shops(
         comp_id=comp.comp_id,
         unit_keys=comp.unit_keys,
         level=args.demo_level,
@@ -82,38 +81,6 @@ def main() -> None:
         "top_comp_match": [asdict(match) for match in top_comp_matches],
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
-
-
-def _demo_state_and_shops(
-    *,
-    comp_id: str,
-    unit_keys: tuple[str, ...],
-    level: int,
-) -> tuple[CurrentBoardState, tuple[tuple[str, ...], ...]]:
-    if level < 1:
-        raise ValueError("level must be positive")
-    board_count = max(1, min(len(unit_keys), max(1, level - 2)))
-    board_units = unit_keys[:board_count]
-    bench_units = unit_keys[board_count : board_count + 2]
-    shop_pool = unit_keys[board_count + 2 :] + unit_keys[: board_count + 2]
-    first_shop = shop_pool[:5]
-    second_shop = shop_pool[2:7]
-    state = CurrentBoardState(
-        stage=3,
-        stage_round=2,
-        level=level,
-        gold=30,
-        board=tuple(
-            CurrentBoardUnit(unit_key=unit_key, position=index)
-            for index, unit_key in enumerate(board_units)
-        ),
-        bench=tuple(CurrentBoardUnit(unit_key=unit_key) for unit_key in bench_units),
-        target_comp_id=comp_id,
-        source="current_patch_policy_smoke",
-        metadata={"line": "policy_smoke"},
-    )
-    return state, (tuple(first_shop), tuple(second_shop))
-
 
 def _parse_levels(value: str) -> tuple[int, ...]:
     levels = tuple(int(part.strip()) for part in value.split(",") if part.strip())
