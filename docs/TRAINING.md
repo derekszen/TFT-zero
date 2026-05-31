@@ -84,21 +84,21 @@ uv run python -m mini_tft.rl.evaluate_policy \
 
 ## Current Baseline
 
-Measured on 2026-05-29 with fixed eval seeds `1000..1099`.
+Toy Set-1-like simulator results. These use the handcrafted abstract combat
+model in `mini_tft.core.combat`, not the current-patch MetaTFT value path.
+
+The latest 5M PPO continuation was measured on 2026-05-31 with fixed eval seeds
+`1000..1499`.
 
 | Policy | Mean final HP | Survival rate | Mean survived round | Mean final strength |
 | --- | ---: | ---: | ---: | ---: |
-| RandomBot | 0.25 | 0.01 | 30.43 | 124.29 |
-| GreedyBoardBot | 0.00 | 0.00 | 31.69 | 121.58 |
+| RandomBot | 0.19 | 0.016 | 30.458 | 123.20 |
+| GreedyBoardBot | 0.00 | 0.000 | 31.578 | 119.03 |
 | EconBot | 0.00 | 0.00 | 20.46 | 0.00 |
-| RerollBot | 0.00 | 0.00 | 27.89 | 70.45 |
-| TraitCommitBot[ranger] | 31.31 | 0.94 | 35.99 | 252.01 |
-| FastLevelBot | 69.05 | 0.99 | 36.00 | 304.52 |
-| BC FastLevel 1k/e8/h64 | 20.15 | 0.72 | 35.67 | 236.56 |
-| BC FastLevel 1k/e60/h64 | 55.41 | 0.98 | 36.00 | 281.99 |
-| BC FastLevel 1k/e60/h256 | 59.50 | 0.98 | 36.00 | 288.75 |
-| BC FastLevel 5k/e80/h256 | 66.30 | 1.00 | 36.00 | 295.88 |
-| PPO from BC 250k/h256 | 70.87 | 1.00 | 36.00 | 312.49 |
+| RerollBot | 0.00 | 0.000 | 28.242 | 73.42 |
+| TraitCommitBot[ranger] | 31.542 | 0.948 | 35.984 | 249.00 |
+| FastLevelBot | 68.812 | 0.986 | 35.994 | 300.75 |
+| PPO from BC 5M/h256 | 77.100 | 0.984 | 35.970 | 336.66 |
 
 Run notes:
 
@@ -108,6 +108,19 @@ Run notes:
   `0.923`.
 - 250k PPO continuation ran at about `2405` env steps/sec on CPU and beat the
   current strongest heuristic, `FastLevelBot`, on the 100-seed eval.
+- 5M GPU PPO continuation from `runs/ppo_gpu_smoke_50k_from_bc_h256.zip` took
+  `6502s` wall time. Final training log reported `769` env steps/sec at
+  `5,304,320` cumulative timesteps. The checkpoint is
+  `checkpoints/ppo_from_bc_fastlevel_5m_h256.zip`.
+
+Interpretation:
+
+- The 5M PPO checkpoint builds stronger final boards than `FastLevelBot` under
+  the toy simulator's scalar board-strength formula.
+- Survival is effectively tied at this horizon: PPO had higher HP/strength but
+  `0.984` survival versus `0.986` for `FastLevelBot` on 500 seeds.
+- These numbers are not a human-rank benchmark and should not be compared to
+  Bronze/Gold real TFT players.
 
 ## World Model
 
@@ -181,6 +194,75 @@ uv run python -m mini_tft.rl.train_metatft_fight_value_model \
 That current-patch checkpoint is a MetaTFT comp ranker, not a drop-in MiniTFT
 combat model. `MiniTFTEnv` rejects it until the simulator uses the same
 current-patch unit namespace.
+
+## PufferLib Usefulness
+
+PufferLib is useful here as a rollout-throughput layer once the environment and
+policy semantics are stable. Its main benefit is vectorized custom-env training
+with serial or multiprocessing workers and less Python overhead than a plain
+single-env loop. For this project, use it after the current-patch symbolic
+shop/econ policy produces sane traces and after reward/value labels are
+calibrated.
+
+Do not use PufferLib to hide model-quality problems. It will not fix weak
+MetaTFT value generalization, bad action pacing, missing unit costs, or an
+incorrect board-state abstraction. The current order should be:
+
+```text
+1. validate current-patch board/value labels
+2. produce sane planner traces
+3. add RL around that loop
+4. use PufferLib if rollout collection becomes the bottleneck
+```
+
+## PPO Overnight Candidate
+
+The strongest checked toy-simulator checkpoint is currently the BC-warmed PPO
+line. A short GPU continuation from
+`checkpoints/ppo_from_bc_fastlevel_250k_h256.zip` improved the 30-seed mean final
+HP from `70.5` to `72.5` and kept survival at `1.0`.
+
+Smoke command:
+
+```bash
+uv run python -m mini_tft.rl.train_ppo \
+  --timesteps 50000 \
+  --seed 42 \
+  --num-envs 8 \
+  --n-steps 512 \
+  --batch-size 2048 \
+  --learning-rate 1e-4 \
+  --device cuda \
+  --init checkpoints/ppo_from_bc_fastlevel_250k_h256.zip \
+  --out runs/ppo_gpu_smoke_50k_from_bc_h256
+```
+
+Completed 5M continuation command:
+
+```bash
+uv run python -m mini_tft.rl.train_ppo \
+  --timesteps 5000000 \
+  --seed 100 \
+  --num-envs 8 \
+  --n-steps 512 \
+  --batch-size 2048 \
+  --learning-rate 1e-4 \
+  --device cuda \
+  --init runs/ppo_gpu_smoke_50k_from_bc_h256.zip \
+  --out checkpoints/ppo_from_bc_fastlevel_5m_h256
+```
+
+The resume path now passes `learning_rate`, `n_steps`, and `batch_size` through
+`MaskablePPO.load(custom_objects=...)`; verify logs show the requested learning
+rate before launching long runs.
+
+Evaluation command:
+
+```bash
+uv run python -m mini_tft.rl.evaluate_policy \
+  --episodes 500 \
+  --checkpoint checkpoints/ppo_from_bc_fastlevel_5m_h256.zip
+```
 
 ## MuZero Later
 

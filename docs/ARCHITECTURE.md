@@ -1,6 +1,48 @@
 # Architecture
 
-The simulator should feel like a small engine even while it remains Python.
+The repo currently has two related but different tracks:
+
+- a fast executable Set-1-like toy simulator for RL loop research
+- a current-patch MetaTFT value/planner path for real-meta board evaluation
+
+Keep these separate when reading results. A PPO checkpoint trained in the toy
+simulator proves the RL pipeline can learn inside that simulator. It does not
+prove real TFT skill.
+
+## Current System Map
+
+| Layer | Main paths | Status | Answers |
+| --- | --- | --- | --- |
+| Toy simulator | `src/mini_tft/core/`, `src/mini_tft/rl/gym_env.py` | Full executable single-player env | Can an agent learn shop/econ/board decisions in a fast TFT-like loop? |
+| Toy policies | `src/mini_tft/bots/`, `src/mini_tft/rl/train_ppo.py` | Heuristic bots, BC, MaskablePPO | Does PPO beat scripted baselines under identical seeds? |
+| Toy strength model | `src/mini_tft/core/combat.py` | Handwritten scalar board strength | Is this board strong according to our abstract Set-1-like rules? |
+| Current-patch catalog | `src/mini_tft/metatft/catalog.py`, `fetch.py` | Rich aggregate ingest | What units/items/traits/augments/comps exist in the current MetaTFT snapshot? |
+| Current-patch encoder/value | `src/mini_tft/metatft/encoders.py`, `value_training.py` | Learned board-value scorer | Can aggregate data rank current-patch boards/comps? |
+| Current-patch planner shell | `src/mini_tft/metatft/planner.py`, `policy.py` | One-turn symbolic policy shell | Which candidate shop/bench/board transition scores best? |
+| Fight-value teacher path | `src/mini_tft/rl/train_fight_value_model.py`, `docs/FIGHT_VALUE_MODEL.md` | Experimental teacher-label/value-net path | Can a detailed teacher produce labels for a faster learned fight evaluator? |
+
+## What Is A Full Simulator Here?
+
+A full simulator needs an executable `reset/step` loop that owns the state and
+all stochastic transitions:
+
+- shop odds and rolling
+- XP, level, gold, interest, and streaks
+- bench, board, item, augment, and trait state
+- combat or a calibrated fight-value replacement
+- episode termination and rewards
+- action masks for everything an agent can choose
+
+`MiniTFTEnv` has this for the toy Set-1-like environment. The current-patch
+MetaTFT path does not yet have it. It can encode states and score candidate
+successor boards, but it does not yet generate full current-patch games by
+itself.
+
+The MetaTFT aggregate data is also not action-trace data. It tells us which
+final comps, units, items, augments, and stage lines correlate with placements.
+It does not directly tell us each player's exact shop, roll, buy, sell, augment,
+positioning, and combat decisions. That is why the current-patch path is a
+value/planner layer today, not a complete RL environment.
 
 ## Package Layout
 
@@ -28,6 +70,7 @@ src/mini_tft/
     masks.py
     featurize.py
   bots/
+  metatft/
   rl/
   tools/
 ```
@@ -100,3 +143,66 @@ Later versions can add:
 Do not start with full combat. Start with an abstract board-strength function and
 a scripted enemy tempo curve. Replace this later with richer combat only after
 the economy/shop loop is learnable.
+
+## Set-1-Like Board Strength
+
+The toy simulator predicts board strength with a hand-built scalar:
+
+```text
+unit base power
+* star multiplier
+* item role multiplier
+* role/position multiplier
++ trait effects
++ item fit bonuses
++ board balance bonuses
++ upgrade reliability bonuses
++ assassin pressure bonus
+```
+
+Combat compares that scalar against a scripted enemy curve:
+
+```text
+p_win = sigmoid((my_strength - enemy_strength) / combat_sigmoid_scale)
+```
+
+This is valid as an internal benchmark for PPO versus heuristic bots, because
+all policies face the same seeds and rules. It is not a real TFT board-strength
+oracle.
+
+## Current-Patch Value Path
+
+The MetaTFT path is intended to become the real-meta board evaluator. It uses
+current-patch aggregate data to train a value model over symbolic board states:
+
+```text
+current board/state -> predicted placement/value
+```
+
+That model can rank final boards and candidate transitions, but the current
+quick checkpoint is still weak enough that it should be treated as a research
+artifact, not a reward oracle. The latest heldout ranking smoke was only
+moderate: pairwise accuracy around `0.643`, Spearman around `0.407`, and top-k
+overlap around `0.50` on heldout comps.
+
+## Auto-Research Harness Direction
+
+The next architecture layer should be an experiment harness, not another
+one-off script. It should run the same loop for each hypothesis:
+
+1. fetch or load a pinned data snapshot
+2. build encoded datasets and train a checkpoint
+3. run fixed-seed or heldout-comp evaluation
+4. compare against baselines in a machine-readable report
+5. save artifacts, traces, metrics, and config together
+
+For this project, the useful experiment families are:
+
+- toy-simulator PPO/BC baselines against heuristic bots
+- current-patch value-model ranking against heldout MetaTFT comp rankings
+- planner-policy traces checked for final top-comp match rate by level 8/9
+- fight-value teacher/model speed and calibration tests
+
+The harness should make it hard to confuse these tracks. Reports should label
+whether a result comes from the toy simulator, current-patch MetaTFT aggregate
+data, a fight teacher, or a learned value model.

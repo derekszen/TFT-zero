@@ -48,24 +48,28 @@ base environment stays light.
 
 ## Current Scope
 
-v0 is intentionally small but playable:
+v0 has two separate research tracks:
 
-- simulator internals under `src/mini_tft/core/`
+- a playable Set-1-like toy simulator under `src/mini_tft/core/`
 - heuristic bots under `src/mini_tft/bots/`
-- RL and dataset helpers under `src/mini_tft/rl/`
+- RL, BC, PPO, and dataset helpers under `src/mini_tft/rl/`
+- current-patch MetaTFT catalog, encoder, value, and planner code under
+  `src/mini_tft/metatft/`
 - CLI/debug tools under `src/mini_tft/tools/`
 - data-driven 24-unit Set 1-labeled pack under `src/mini_tft/data/`
-- Gymnasium-style flat observation environment with bool action masks
 - smoke tests under `tests/`
 - markdown specs under `docs/`
 
-The env is still not exact TFT. Combat, traits, and items are abstract power
-models designed to support fast RL iteration.
+The toy env is still not exact TFT. Combat, traits, and items are abstract power
+models designed to support fast RL iteration. The current-patch MetaTFT path is
+more realistic for board/comp value, but it is currently a value/planner layer,
+not a full turn-by-turn RL environment.
 
 ## Documentation
 
 - [Project Brief](docs/PROJECT_BRIEF.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Branch Architecture](docs/BRANCH_ARCHITECTURE.md)
 - [V0 Build Plan](docs/V0_BUILD_PLAN.md)
 - [Data Generation](docs/DATA_GENERATION.md)
 - [Training Plan](docs/TRAINING.md)
@@ -73,14 +77,15 @@ models designed to support fast RL iteration.
 
 ## Current Baseline
 
-Fixed-seed eval over seeds `1000..1099` now has a warm-started PPO policy above
-the strongest heuristic:
+Toy Set-1-like simulator eval over seeds `1000..1499`:
 
 | Policy | Mean final HP | Survival rate | Mean final strength |
 | --- | ---: | ---: | ---: |
-| FastLevelBot | 69.05 | 0.99 | 304.52 |
-| BC FastLevel 5k/e80/h256 | 66.30 | 1.00 | 295.88 |
-| PPO from BC 250k/h256 | 70.87 | 1.00 | 312.49 |
+| FastLevelBot | 68.812 | 0.986 | 300.75 |
+| PPO from BC 5M/h256 | 77.100 | 0.984 | 336.66 |
+
+This is a toy-simulator result. The board-strength number comes from the
+handcrafted abstract combat model, not from MetaTFT or real player data.
 
 ## Development Rules
 
