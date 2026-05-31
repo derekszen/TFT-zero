@@ -6,11 +6,17 @@ import numpy as np
 import pytest
 
 from mini_tft.metatft import (
+    CandidateTransition,
     CatalogAugment,
     CatalogItem,
     CurrentBoardEncoder,
     CurrentBoardState,
     CurrentBoardUnit,
+    CurrentPatchPlannerScorer,
+    CurrentPatchShopEconPolicy,
+    ScoredTransition,
+    ShopEconPolicyConfig,
+    build_shop_bench_board_transitions,
     derive_stage_line_states,
     final_board_state,
     load_catalog_from_comp_strength,
@@ -142,6 +148,23 @@ def test_encoder_supports_manual_state_with_items_traits_augments_and_bench() ->
     assert encoded.augment_ids[0] == 1
 
 
+def test_encoder_can_blind_target_comp_metadata_for_heldout_validation() -> None:
+    catalog = load_catalog_from_comp_strength(FIXTURE)
+    state = final_board_state(catalog, "409003")
+
+    leaked = CurrentBoardEncoder(catalog).encode(state)
+    blinded = CurrentBoardEncoder(
+        catalog,
+        include_target_stats=False,
+        include_target_comp_id=False,
+    ).encode(state)
+
+    assert int(leaked.target_comp_id) == catalog.comp_index("409003")
+    assert int(blinded.target_comp_id) == 0
+    assert np.count_nonzero(leaked.scalars[-3:]) > 0
+    assert np.count_nonzero(blinded.scalars[-3:]) == 0
+
+
 def test_stage_line_encoder_projects_final_comp_into_early_mid_late_final_states() -> None:
     catalog = load_catalog_from_comp_strength(FIXTURE)
     encoder = CurrentBoardEncoder(catalog)
@@ -169,6 +192,7 @@ def test_rich_catalog_ingests_real_item_trait_augment_and_line_shapes() -> None:
     encoded_lines = CurrentBoardEncoder(catalog).encode_stage_lines("409003")
 
     assert catalog.item_count == 3
+    assert catalog._unit_by_key["TFT17_MissFortune"].cost == 4
     assert catalog.augment_id("TFT17_Augment_JaxCarry") > 0
     assert catalog.trait_count >= 2
     assert comp.item_builds[0].unit_key == "TFT17_MissFortune"
@@ -219,6 +243,164 @@ def test_current_patch_value_model_training_smoke(tmp_path: Path) -> None:
     assert report.examples >= 4
     assert report.loss >= 0.0
     assert 0.0 <= report.pairwise_accuracy <= 1.0
+
+
+def test_current_patch_value_training_reports_heldout_comp_rankings(tmp_path: Path) -> None:
+    torch = pytest.importorskip("torch")
+    catalog = load_catalog_from_comp_strength(FIXTURE)
+    checkpoint = tmp_path / "current_patch_value_heldout.pt"
+
+    report = train_current_patch_value_model(
+        catalog,
+        output=checkpoint,
+        device_name="cpu",
+        epochs=5,
+        learning_rate=1e-3,
+        hidden_dim=32,
+        embed_dim=16,
+        validation_fraction=0.25,
+        blind_target_metadata=True,
+    )
+    payload = torch.load(checkpoint, map_location="cpu")
+
+    assert report.train_examples < report.examples
+    assert report.heldout_examples > 0
+    assert report.heldout_comp_count > 0
+    assert report.heldout_pairwise_accuracy is not None
+    assert report.heldout_spearman is not None
+    assert report.target_metadata_blinded is True
+    assert payload["encoder"] == {
+        "include_target_stats": False,
+        "include_target_comp_id": False,
+    }
+    assert payload["metrics"]["heldout_examples"] == report.heldout_examples
+
+
+def test_current_patch_planner_scorer_ranks_shop_bench_board_transitions(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("torch")
+    catalog = load_catalog_from_payload(_rich_fixture_payload())
+    checkpoint = tmp_path / "current_patch_value_planner.pt"
+    train_current_patch_value_model(
+        catalog,
+        output=checkpoint,
+        device_name="cpu",
+        epochs=8,
+        learning_rate=1e-3,
+        hidden_dim=32,
+        embed_dim=16,
+        blind_target_metadata=True,
+    )
+    scorer = CurrentPatchPlannerScorer.from_checkpoint(
+        catalog,
+        checkpoint,
+        device_name="cpu",
+    )
+    state = CurrentBoardState(
+        stage=3,
+        stage_round=2,
+        level=4,
+        gold=10,
+        board=(CurrentBoardUnit("TFT17_Aatrox", position=0),),
+        bench=(CurrentBoardUnit("TFT17_MissFortune", position=0),),
+        active_trait_keys=("TFT17_ASTrait",),
+        target_comp_id="409003",
+    )
+    candidates = build_shop_bench_board_transitions(
+        state,
+        shop_unit_keys=("TFT17_Belveth", "TFT17_Ornn"),
+        unit_costs={"TFT17_Belveth": 2, "TFT17_Ornn": 4},
+    )
+
+    ranked = scorer.rank_transitions(candidates)
+
+    assert len(ranked) >= 5
+    assert [row.rank for row in ranked] == list(range(1, len(ranked) + 1))
+    assert all(np.isfinite(row.after_value) for row in ranked)
+    assert all(
+        ranked[index].rank_score >= ranked[index + 1].rank_score
+        for index in range(len(ranked) - 1)
+    )
+    assert any(row.action.startswith("field_bench_0") for row in ranked)
+    assert any(row.transition.after.source == "planner_candidate" for row in ranked)
+
+
+def test_current_patch_shop_econ_policy_loops_shop_and_board_actions() -> None:
+    policy = CurrentPatchShopEconPolicy(
+        _TypePriorityScorer(),
+        config=ShopEconPolicyConfig(max_actions_per_turn=2, min_value_delta=-1.0),
+    )
+    state = CurrentBoardState(
+        stage=3,
+        stage_round=2,
+        level=3,
+        gold=12,
+        board=(CurrentBoardUnit("TFT17_Aatrox", position=0),),
+        bench=(CurrentBoardUnit("TFT17_MissFortune", position=0),),
+        active_trait_keys=("TFT17_ASTrait",),
+        target_comp_id="409003",
+    )
+
+    plan = policy.plan_turn(
+        state,
+        shops=(("TFT17_Belveth", "TFT17_Ornn"),),
+        unit_costs={"TFT17_Belveth": 2, "TFT17_Ornn": 4},
+    )
+
+    action_types = [decision.transition.metadata["type"] for decision in plan.decisions]
+    assert action_types[:2] == ["field_bench", "buy_to_board"]
+    assert plan.final_state.gold == 10
+    assert len(plan.final_state.board) == 3
+    assert plan.final_shop[0] == ""
+
+
+class _TypePriorityScorer:
+    priorities = {
+        "field_bench": 100.0,
+        "buy_to_board": 90.0,
+        "buy_xp": 80.0,
+        "buy_to_bench": 70.0,
+        "swap": 60.0,
+        "end_turn": 0.0,
+        "roll": -10.0,
+    }
+
+    def rank_transitions(
+        self,
+        transitions: list[CandidateTransition],
+        *,
+        rank_by: str = "after_value",
+    ) -> tuple[ScoredTransition, ...]:
+        del rank_by
+        scored = []
+        for transition in transitions:
+            action_type = str(transition.metadata.get("type", "unknown"))
+            score = self.priorities.get(action_type, -100.0)
+            scored.append(
+                ScoredTransition(
+                    rank=0,
+                    action=transition.action,
+                    after_value=score,
+                    before_value=0.0,
+                    delta=score,
+                    rank_score=score,
+                    transition=transition,
+                )
+            )
+        scored.sort(key=lambda row: row.rank_score, reverse=True)
+        return tuple(
+            ScoredTransition(
+                rank=index + 1,
+                action=row.action,
+                after_value=row.after_value,
+                before_value=row.before_value,
+                delta=row.delta,
+                rank_score=row.rank_score,
+                transition=row.transition,
+            )
+            for index, row in enumerate(scored)
+        )
 
 
 def _fixture_source_records() -> tuple[dict[str, object], list[dict[str, object]]]:
@@ -309,6 +491,17 @@ def _rich_fixture_payload() -> dict[str, object]:
                         "places": [100, 90, 80, 70, 60, 50, 40, 30],
                     }
                 ]
+            },
+            "unit_costs": {
+                "TFT17_Aatrox": 1,
+                "TFT17_Belveth": 2,
+                "TFT17_Kindred": 3,
+                "TFT17_Maokai": 1,
+                "TFT17_MissFortune": 4,
+                "TFT17_Ornn": 4,
+                "TFT17_Rhaast": 5,
+                "TFT17_RekSai": 1,
+                "TFT17_Urgot": 5,
             },
             "tables": {
                 "itemEffects": {

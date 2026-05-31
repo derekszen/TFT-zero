@@ -30,6 +30,7 @@ class CatalogUnit:
     unit_id: int
     key: str
     display_name: str
+    cost: int | None = None
 
 
 @dataclass(frozen=True)
@@ -253,8 +254,14 @@ def build_catalog_from_comp_records(
             *{unit for details in details_by_comp.values() for unit in _detail_unit_keys(details)},
         }
     )
+    unit_costs = _unit_costs(rich)
     units = tuple(
-        CatalogUnit(index + 1, unit_key, _display_name(unit_key))
+        CatalogUnit(
+            index + 1,
+            unit_key,
+            _display_name(unit_key),
+            unit_costs.get(unit_key),
+        )
         for index, unit_key in enumerate(unit_keys)
     )
     unit_id_by_key = {unit.key: unit.unit_id for unit in units}
@@ -538,6 +545,19 @@ def _unit_item_keys(rich: dict[str, Any] | None) -> set[str]:
     if isinstance(item_names, list | tuple):
         return {str(item) for item in item_names}
     return set()
+
+
+def _unit_costs(rich: dict[str, Any] | None) -> dict[str, int]:
+    if not rich:
+        return {}
+    costs = rich.get("unit_costs", {})
+    if not isinstance(costs, dict):
+        return {}
+    return {
+        str(unit_key): max(0, int(cost))
+        for unit_key, cost in costs.items()
+        if unit_key and cost is not None
+    }
 
 
 def _stat_item_keys(rich: dict[str, Any] | None) -> set[str]:

@@ -60,6 +60,8 @@ class CurrentBoardEncoder:
         max_items_per_unit: int = MAX_ITEMS_PER_UNIT,
         max_traits: int = DEFAULT_MAX_TRAITS,
         max_augments: int = DEFAULT_MAX_AUGMENTS,
+        include_target_stats: bool = True,
+        include_target_comp_id: bool = True,
     ) -> None:
         self.catalog = catalog
         self.max_board_tokens = max_board_tokens
@@ -67,6 +69,8 @@ class CurrentBoardEncoder:
         self.max_items_per_unit = max_items_per_unit
         self.max_traits = max_traits
         self.max_augments = max_augments
+        self.include_target_stats = include_target_stats
+        self.include_target_comp_id = include_target_comp_id
 
     @property
     def scalar_dim(self) -> int:
@@ -78,7 +82,11 @@ class CurrentBoardEncoder:
         if len(state.bench) > self.max_bench_tokens:
             raise ValueError("bench has more units than this encoder supports")
 
-        target_comp = self.catalog.comp(state.target_comp_id) if state.target_comp_id else None
+        target_comp = (
+            self.catalog.comp(state.target_comp_id)
+            if state.target_comp_id and self.include_target_stats
+            else None
+        )
         return EncodedBoardState(
             unit_namespace=self.catalog.unit_namespace,
             scalars=self._scalars(state, target_comp),
@@ -89,7 +97,11 @@ class CurrentBoardEncoder:
             bench_unit_ids=self._unit_ids(state.bench, self.max_bench_tokens),
             active_trait_ids=self._tag_ids(state.active_trait_keys, self.max_traits),
             augment_ids=self._augment_ids(state.augment_keys, self.max_augments),
-            target_comp_id=np.int16(self.catalog.comp_index(state.target_comp_id)),
+            target_comp_id=np.int16(
+                self.catalog.comp_index(state.target_comp_id)
+                if self.include_target_comp_id
+                else 0
+            ),
         )
 
     def encode_final_board(self, comp_id: str) -> EncodedBoardState:

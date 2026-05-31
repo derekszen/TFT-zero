@@ -24,17 +24,31 @@ from mini_tft.metatft.encoders import (
     derive_stage_line_states,
     final_board_state,
 )
+from mini_tft.metatft.planner import (
+    CandidateTransition,
+    CurrentPatchPlannerScorer,
+    ScoredTransition,
+    build_shop_bench_board_transitions,
+)
+from mini_tft.metatft.policy import (
+    CurrentPatchShopEconPolicy,
+    PolicyTurnPlan,
+    ShopEconPolicyConfig,
+)
 from mini_tft.metatft.schema import CurrentBoardState, CurrentBoardUnit
 from mini_tft.metatft.value_training import (
     BoardValueBatch,
+    CurrentPatchRankingReport,
     CurrentPatchValueConfig,
     CurrentPatchValueNet,
     CurrentPatchValueTrainReport,
     build_value_training_batch,
+    ranking_report,
     train_current_patch_value_model,
 )
 
 __all__ = [
+    "CandidateTransition",
     "CatalogMetadata",
     "CatalogAugment",
     "CatalogItem",
@@ -43,6 +57,9 @@ __all__ = [
     "CatalogUnit",
     "CompStageLine",
     "CurrentBoardEncoder",
+    "CurrentPatchPlannerScorer",
+    "CurrentPatchShopEconPolicy",
+    "CurrentPatchRankingReport",
     "CurrentBoardState",
     "CurrentBoardUnit",
     "CurrentPatchValueConfig",
@@ -52,15 +69,20 @@ __all__ = [
     "EncodedStageLine",
     "MetaTFTCatalog",
     "MetaTFTComp",
+    "PolicyTurnPlan",
+    "ScoredTransition",
+    "ShopEconPolicyConfig",
     "STAGE_LINE_SPECS",
     "TraitBreakpoint",
     "UnitItemBuild",
     "BoardValueBatch",
     "build_catalog_from_comp_records",
+    "build_shop_bench_board_transitions",
     "build_value_training_batch",
     "derive_stage_line_states",
     "final_board_state",
     "load_catalog_from_comp_strength",
     "load_catalog_from_payload",
+    "ranking_report",
     "train_current_patch_value_model",
 ]
