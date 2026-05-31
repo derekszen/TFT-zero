@@ -202,3 +202,26 @@ uv run python -m mini_tft.tools.plan_current_patch_turn \
   --checkpoint checkpoints/fight_value/current_patch_board_value.pt \
   --device cuda
 ```
+
+The smoke output includes `top_comp_match` metrics for level 8 and level 9 by
+default. The metric compares the planner trace's final board against the top
+MetaTFT comps with multiset unit overlap:
+
+- `eligible`: whether the trace reached the target level
+- `exact_match`: whether the final board exactly matches the target top-comp
+  board at that level
+- `partial_match`: whether recall is at or above `--min-recall`, default `0.75`
+- `precision`, `recall`, and `jaccard`: overlap quality against the best top-k
+  comp match
+
+Use a higher demo level when smoke-testing the level 8/9 metric:
+
+```bash
+uv run python -m mini_tft.tools.plan_current_patch_turn \
+  --catalog data/metatft/current_rich_catalog.json \
+  --checkpoint checkpoints/fight_value/current_patch_board_value.pt \
+  --device cuda \
+  --demo-level 8 \
+  --match-levels 8,9 \
+  --top-k 10
+```

@@ -21,6 +21,7 @@ from mini_tft.metatft import (
     final_board_state,
     load_catalog_from_comp_strength,
     load_catalog_from_payload,
+    top_comp_match_report,
 )
 from mini_tft.metatft.catalog import UNIT_NAMESPACE
 from mini_tft.metatft.schema import MAX_BOARD_TOKENS
@@ -353,6 +354,71 @@ def test_current_patch_shop_econ_policy_loops_shop_and_board_actions() -> None:
     assert plan.final_state.gold == 10
     assert len(plan.final_state.board) == 3
     assert plan.final_shop[0] == ""
+
+
+def test_top_comp_match_report_matches_level_9_final_board() -> None:
+    catalog = load_catalog_from_comp_strength(FIXTURE)
+    state = final_board_state(catalog, "409003")
+
+    report = top_comp_match_report(
+        catalog,
+        state.board_unit_keys,
+        board_level=9,
+        levels=(9,),
+        top_k=3,
+    )
+
+    match = report[0]
+    assert match.level == 9
+    assert match.eligible is True
+    assert match.comp_id == "409003"
+    assert match.comp_rank == 1
+    assert match.exact_match is True
+    assert match.partial_match is True
+    assert match.overlap_count == match.target_unit_count == len(state.board)
+    assert match.jaccard == pytest.approx(1.0)
+    assert match.missing_units == ()
+    assert match.extra_units == ()
+
+
+def test_top_comp_match_report_uses_rich_level_8_stage_line() -> None:
+    catalog = load_catalog_from_payload(_rich_fixture_payload())
+    comp = catalog.comp("409003")
+    level_8_line = next(line for line in comp.stage_lines if line.level == 8)
+
+    report = top_comp_match_report(
+        catalog,
+        level_8_line.unit_keys,
+        board_level=8,
+        levels=(8,),
+        top_k=1,
+    )
+
+    match = report[0]
+    assert match.level == 8
+    assert match.eligible is True
+    assert match.comp_id == "409003"
+    assert match.exact_match is True
+    assert match.target_unit_count == 8
+    assert match.overlap_count == 8
+
+
+def test_top_comp_match_report_marks_underleveled_traces_ineligible() -> None:
+    catalog = load_catalog_from_comp_strength(FIXTURE)
+    state = final_board_state(catalog, "409003")
+
+    report = top_comp_match_report(
+        catalog,
+        state.board_unit_keys[:6],
+        board_level=6,
+        levels=(8, 9),
+        top_k=3,
+    )
+
+    assert [match.level for match in report] == [8, 9]
+    assert all(match.eligible is False for match in report)
+    assert all(match.partial_match is False for match in report)
+    assert all(match.exact_match is False for match in report)
 
 
 class _TypePriorityScorer:

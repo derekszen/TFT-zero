@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import asdict
 from pathlib import Path
 
 from mini_tft.metatft import (
@@ -12,6 +13,7 @@ from mini_tft.metatft import (
     CurrentPatchShopEconPolicy,
     ShopEconPolicyConfig,
     load_catalog_from_comp_strength,
+    top_comp_match_report,
 )
 
 
@@ -22,11 +24,19 @@ def main() -> None:
     parser.add_argument("--comp-id", default=None)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--max-actions", type=int, default=8)
+    parser.add_argument("--demo-level", type=int, default=5)
+    parser.add_argument("--match-levels", default="8,9")
+    parser.add_argument("--top-k", type=int, default=10)
+    parser.add_argument("--min-recall", type=float, default=0.75)
     args = parser.parse_args()
 
     catalog = load_catalog_from_comp_strength(args.catalog)
     comp = catalog.comp(args.comp_id) if args.comp_id else catalog.comps[0]
-    state, shops = _demo_state_and_shops(comp_id=comp.comp_id, unit_keys=comp.unit_keys)
+    state, shops = _demo_state_and_shops(
+        comp_id=comp.comp_id,
+        unit_keys=comp.unit_keys,
+        level=args.demo_level,
+    )
     policy = CurrentPatchShopEconPolicy.from_checkpoint(
         catalog,
         args.checkpoint,
@@ -34,6 +44,15 @@ def main() -> None:
         config=ShopEconPolicyConfig(max_actions_per_turn=args.max_actions),
     )
     plan = policy.plan_turn(state, shops=shops)
+    match_levels = _parse_levels(args.match_levels)
+    top_comp_matches = top_comp_match_report(
+        catalog,
+        plan.final_state.board_unit_keys,
+        board_level=plan.final_state.level,
+        levels=match_levels,
+        top_k=args.top_k,
+        min_recall=args.min_recall,
+    )
     payload = {
         "catalog": str(args.catalog),
         "checkpoint": str(args.checkpoint),
@@ -60,6 +79,7 @@ def main() -> None:
         "final_level": plan.final_state.level,
         "final_shop": list(plan.final_shop),
         "stopped": plan.stopped,
+        "top_comp_match": [asdict(match) for match in top_comp_matches],
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
 
@@ -68,15 +88,20 @@ def _demo_state_and_shops(
     *,
     comp_id: str,
     unit_keys: tuple[str, ...],
+    level: int,
 ) -> tuple[CurrentBoardState, tuple[tuple[str, ...], ...]]:
-    board_units = unit_keys[:3]
-    bench_units = unit_keys[3:5]
-    first_shop = unit_keys[5:10]
-    second_shop = unit_keys[2:7]
+    if level < 1:
+        raise ValueError("level must be positive")
+    board_count = max(1, min(len(unit_keys), max(1, level - 2)))
+    board_units = unit_keys[:board_count]
+    bench_units = unit_keys[board_count : board_count + 2]
+    shop_pool = unit_keys[board_count + 2 :] + unit_keys[: board_count + 2]
+    first_shop = shop_pool[:5]
+    second_shop = shop_pool[2:7]
     state = CurrentBoardState(
         stage=3,
         stage_round=2,
-        level=5,
+        level=level,
         gold=30,
         board=tuple(
             CurrentBoardUnit(unit_key=unit_key, position=index)
@@ -88,6 +113,15 @@ def _demo_state_and_shops(
         metadata={"line": "policy_smoke"},
     )
     return state, (tuple(first_shop), tuple(second_shop))
+
+
+def _parse_levels(value: str) -> tuple[int, ...]:
+    levels = tuple(int(part.strip()) for part in value.split(",") if part.strip())
+    if not levels:
+        raise ValueError("--match-levels must include at least one level")
+    if any(level < 1 for level in levels):
+        raise ValueError("--match-levels must contain positive integers")
+    return levels
 
 
 if __name__ == "__main__":
