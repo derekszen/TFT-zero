@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 from mini_tft.metatft.catalog import MetaTFTCatalog
 from mini_tft.metatft.metrics import TopCompMatch, top_comp_match_report
@@ -39,6 +40,41 @@ class PlannerTraceEvaluation:
 
 
 @dataclass(frozen=True)
+class PlannerUnitFrequency:
+    unit_key: str
+    count: int
+
+
+@dataclass(frozen=True)
+class PlannerExactFailureExample:
+    comp_id: str
+    comp_rank: int
+    comp_name: str
+    demo_level: int
+    match_level: int
+    final_level: int
+    board_unit_count: int
+    target_unit_count: int
+    matched_comp_id: str
+    recall: float
+    jaccard: float
+    missing_units: tuple[str, ...]
+    extra_units: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class PlannerExactFailureSummary:
+    level: int
+    failed_count: int
+    underleveled_count: int
+    underfilled_count: int
+    unit_mismatch_count: int
+    top_missing_units: tuple[PlannerUnitFrequency, ...]
+    top_extra_units: tuple[PlannerUnitFrequency, ...]
+    examples: tuple[PlannerExactFailureExample, ...]
+
+
+@dataclass(frozen=True)
 class PlannerLevelMatchSummary:
     level: int
     trace_count: int
@@ -54,6 +90,38 @@ class PlannerLevelMatchSummary:
     mean_jaccard: float
 
 
+PlannerGateMetric = Literal[
+    "exact_match_rate",
+    "partial_match_rate",
+    "good_enough_rate",
+    "eligible_good_enough_rate",
+    "mean_recall",
+    "mean_jaccard",
+]
+
+
+@dataclass(frozen=True)
+class PlannerMetricRequirement:
+    level: int
+    metric: PlannerGateMetric
+    minimum: float
+
+
+@dataclass(frozen=True)
+class PlannerGateFailure:
+    level: int
+    metric: PlannerGateMetric
+    actual: float
+    minimum: float
+
+
+@dataclass(frozen=True)
+class PlannerGateResult:
+    passed: bool
+    requirements: tuple[PlannerMetricRequirement, ...]
+    failures: tuple[PlannerGateFailure, ...]
+
+
 @dataclass(frozen=True)
 class PlannerBatchEvaluation:
     comp_ids: tuple[str, ...]
@@ -63,6 +131,7 @@ class PlannerBatchEvaluation:
     min_recall: float
     traces: tuple[PlannerTraceEvaluation, ...]
     summaries: tuple[PlannerLevelMatchSummary, ...]
+    exact_failure_summaries: tuple[PlannerExactFailureSummary, ...]
 
 
 def evaluate_planner_trace_batch(
@@ -131,6 +200,35 @@ def evaluate_planner_trace_batch(
         min_recall=min_recall,
         traces=tuple(traces),
         summaries=_summarize_matches(traces, match_level_values),
+        exact_failure_summaries=_summarize_exact_failures(traces, match_level_values),
+    )
+
+
+def evaluate_planner_batch_gate(
+    report: PlannerBatchEvaluation,
+    requirements: Sequence[PlannerMetricRequirement],
+) -> PlannerGateResult:
+    """Check level-specific planner metrics for use as a regression gate."""
+
+    summary_by_level = {summary.level: summary for summary in report.summaries}
+    failures = []
+    for requirement in requirements:
+        summary = summary_by_level.get(requirement.level)
+        actual = 0.0 if summary is None else float(getattr(summary, requirement.metric))
+        if actual < requirement.minimum:
+            failures.append(
+                PlannerGateFailure(
+                    level=requirement.level,
+                    metric=requirement.metric,
+                    actual=actual,
+                    minimum=requirement.minimum,
+                )
+            )
+    requirement_values = tuple(requirements)
+    return PlannerGateResult(
+        passed=not failures,
+        requirements=requirement_values,
+        failures=tuple(failures),
     )
 
 
@@ -220,6 +318,66 @@ def _summarize_matches(
     return tuple(summaries)
 
 
+def _summarize_exact_failures(
+    traces: Sequence[PlannerTraceEvaluation],
+    levels: Sequence[int],
+    *,
+    max_units: int = 8,
+    max_examples: int = 5,
+) -> tuple[PlannerExactFailureSummary, ...]:
+    summaries = []
+    for level in levels:
+        failures = [
+            (trace, match)
+            for trace in traces
+            for match in trace.matches
+            if match.level == level and not match.exact_match
+        ]
+        missing = Counter(
+            unit for _, match in failures for unit in match.missing_units
+        )
+        extra = Counter(unit for _, match in failures for unit in match.extra_units)
+        examples = tuple(
+            PlannerExactFailureExample(
+                comp_id=trace.comp_id,
+                comp_rank=trace.comp_rank,
+                comp_name=trace.comp_name,
+                demo_level=trace.demo_level,
+                match_level=match.level,
+                final_level=trace.final_level,
+                board_unit_count=match.board_unit_count,
+                target_unit_count=match.target_unit_count,
+                matched_comp_id=match.comp_id,
+                recall=match.recall,
+                jaccard=match.jaccard,
+                missing_units=match.missing_units,
+                extra_units=match.extra_units,
+            )
+            for trace, match in failures[:max_examples]
+        )
+        summaries.append(
+            PlannerExactFailureSummary(
+                level=level,
+                failed_count=len(failures),
+                underleveled_count=sum(1 for _, match in failures if not match.eligible),
+                underfilled_count=sum(
+                    1
+                    for _, match in failures
+                    if match.eligible and match.board_unit_count < match.target_unit_count
+                ),
+                unit_mismatch_count=sum(
+                    1
+                    for _, match in failures
+                    if match.eligible and (match.missing_units or match.extra_units)
+                ),
+                top_missing_units=_top_units(missing, max_units),
+                top_extra_units=_top_units(extra, max_units),
+                examples=examples,
+            )
+        )
+    return tuple(summaries)
+
+
 def _rate(numerator: int, denominator: int) -> float:
     return numerator / denominator if denominator else 0.0
 
@@ -227,3 +385,10 @@ def _rate(numerator: int, denominator: int) -> float:
 def _mean(values: Iterable[float]) -> float:
     values = tuple(values)
     return sum(values) / len(values) if values else 0.0
+
+
+def _top_units(counter: Counter[str], limit: int) -> tuple[PlannerUnitFrequency, ...]:
+    return tuple(
+        PlannerUnitFrequency(unit_key=unit_key, count=count)
+        for unit_key, count in counter.most_common(limit)
+    )

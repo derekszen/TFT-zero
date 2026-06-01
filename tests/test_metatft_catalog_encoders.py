@@ -15,11 +15,13 @@ from mini_tft.metatft import (
     CurrentBoardUnit,
     CurrentPatchPlannerScorer,
     CurrentPatchShopEconPolicy,
+    PlannerMetricRequirement,
     PolicyTurnPlan,
     ScoredTransition,
     ShopEconPolicyConfig,
     build_shop_bench_board_transitions,
     derive_stage_line_states,
+    evaluate_planner_batch_gate,
     evaluate_planner_trace_batch,
     final_board_state,
     load_catalog_from_comp_strength,
@@ -454,6 +456,57 @@ def test_planner_trace_batch_summarizes_level_8_and_9_match_rates() -> None:
     assert level_9.good_enough_count == _count_matches(report.traces, 9, "good_enough")
     assert level_9.good_enough_rate == pytest.approx(0.5)
     assert level_9.eligible_good_enough_rate == pytest.approx(1.0)
+
+    level_9_failures = report.exact_failure_summaries[1]
+    assert level_9_failures.level == 9
+    assert level_9_failures.failed_count == level_9.trace_count - level_9.exact_match_count
+    assert level_9_failures.underleveled_count == 2
+    assert level_9_failures.examples
+
+
+def test_planner_batch_gate_reports_threshold_failures() -> None:
+    catalog = load_catalog_from_comp_strength(FIXTURE)
+    report = evaluate_planner_trace_batch(
+        catalog,
+        _FinalCompPlanner(catalog),
+        comp_ids=("409003", "409000"),
+        demo_levels=(8, 9),
+        match_levels=(8, 9),
+        top_k=16,
+        min_recall=0.75,
+    )
+
+    passing_gate = evaluate_planner_batch_gate(
+        report,
+        (
+            PlannerMetricRequirement(
+                level=8,
+                metric="good_enough_rate",
+                minimum=1.0,
+            ),
+            PlannerMetricRequirement(
+                level=9,
+                metric="eligible_good_enough_rate",
+                minimum=1.0,
+            ),
+        ),
+    )
+    assert passing_gate.passed is True
+    assert passing_gate.failures == ()
+
+    failing_gate = evaluate_planner_batch_gate(
+        report,
+        (
+            PlannerMetricRequirement(
+                level=9,
+                metric="good_enough_rate",
+                minimum=0.75,
+            ),
+        ),
+    )
+    assert failing_gate.passed is False
+    assert failing_gate.failures[0].level == 9
+    assert failing_gate.failures[0].actual == pytest.approx(0.5)
 
 
 class _TypePriorityScorer:

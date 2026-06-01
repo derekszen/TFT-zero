@@ -243,10 +243,45 @@ uv run python -m mini_tft.tools.evaluate_current_patch_planner \
   --out runs/current_patch_planner_eval.json
 ```
 
+Use the same command as a regression gate before changing RL rewards/search.
+The current smoke gate tracks exact matches but gates on the stable partial
+target-match baseline:
+
+```bash
+uv run python -m mini_tft.tools.evaluate_current_patch_planner \
+  --catalog data/metatft/current_rich_catalog.json \
+  --checkpoint checkpoints/fight_value/current_patch_board_value.pt \
+  --device cuda \
+  --comp-limit 8 \
+  --demo-levels 8,9 \
+  --match-levels 8,9 \
+  --top-k 10 \
+  --min-recall 0.75 \
+  --require-good-enough-rate 8:0.60 \
+  --require-eligible-good-enough-rate 9:0.60 \
+  --out runs/current_patch_planner_gate.json
+```
+
+The command exits non-zero when a required metric drops below threshold, and
+the JSON report includes `gate.failures` plus `exact_failure_summaries` for
+debugging exact-match regressions.
+
 The batch report summarizes per-level `exact_match_rate`,
 `partial_match_rate`, `good_enough_rate`, and `eligible_good_enough_rate`.
 Current default threshold:
 
 ```text
 good_enough = eligible and (exact_match or recall >= 0.75)
+```
+
+Current exact-match investigation:
+
+```text
+The 8-comp smoke has exact_match_count = 0 at both level 8 and level 9.
+The main blocker is not eligibility at level 8; it is unit mismatch.
+The one-step value planner can buy/swap duplicates and high-value substitutes,
+but it has no terminal constraint that forces the final board to exactly equal
+the target comp list. Level 9 also includes underleveled traces from level 8
+demo starts, so use eligible_good_enough_rate there until full level-9 planning
+is implemented.
 ```
