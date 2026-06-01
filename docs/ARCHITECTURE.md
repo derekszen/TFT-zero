@@ -1,13 +1,15 @@
 # Architecture
 
-The repo currently has two related but different tracks:
+The repo currently has three related but different tracks:
 
 - a fast executable Set-1-like toy simulator for RL loop research
 - a current-patch MetaTFT value/planner path for real-meta board evaluation
+- a fight-value teacher/model path for combat-label experiments
 
 Keep these separate when reading results. A PPO checkpoint trained in the toy
 simulator proves the RL pipeline can learn inside that simulator. It does not
-prove real TFT skill.
+prove real TFT skill. A current-patch planner trace that matches MetaTFT comps
+proves symbolic board completion under fixed trace seeds, not full-game RL.
 
 ## Current System Map
 
@@ -18,8 +20,18 @@ prove real TFT skill.
 | Toy strength model | `src/mini_tft/core/combat.py` | Handwritten scalar board strength | Is this board strong according to our abstract Set-1-like rules? |
 | Current-patch catalog | `src/mini_tft/metatft/catalog.py`, `fetch.py` | Rich aggregate ingest | What units/items/traits/augments/comps exist in the current MetaTFT snapshot? |
 | Current-patch encoder/value | `src/mini_tft/metatft/encoders.py`, `value_training.py` | Learned board-value scorer | Can aggregate data rank current-patch boards/comps? |
-| Current-patch planner shell | `src/mini_tft/metatft/planner.py`, `policy.py` | One-turn symbolic policy shell | Which candidate shop/bench/board transition scores best? |
+| Current-patch planner shell | `src/mini_tft/metatft/planner.py`, `policy.py`, `planner_evaluation.py` | Target-guided symbolic policy shell with batch gates | Can fixed level 8/9 traces complete top MetaTFT boards? |
 | Fight-value teacher path | `src/mini_tft/rl/train_fight_value_model.py`, `docs/FIGHT_VALUE_MODEL.md` | Experimental teacher-label/value-net path | Can a detailed teacher produce labels for a faster learned fight evaluator? |
+
+## Current Claims
+
+The strongest claims currently supported by code and reports are:
+
+| Claim | Evidence | Limitation |
+| --- | --- | --- |
+| PPO can improve over scripted play in the toy simulator | 5M PPO report beats FastLevelBot on mean HP and board strength | Uses abstract Set-1-like combat, not real TFT |
+| Current-patch value model can rank boards moderately | heldout MetaTFT ranking smoke: pairwise accuracy ~0.643, Spearman ~0.407 | Not yet strong enough to be the only reward oracle |
+| Current-patch planner can complete target boards in fixed traces | batch gate requires level 8 and 9 exact match rate of `1.0` | Trace seeds already expose target units; this is planner correctness, not learned gameplay |
 
 ## What Is A Full Simulator Here?
 
@@ -179,11 +191,36 @@ current-patch aggregate data to train a value model over symbolic board states:
 current board/state -> predicted placement/value
 ```
 
-That model can rank final boards and candidate transitions, but the current
-quick checkpoint is still weak enough that it should be treated as a research
-artifact, not a reward oracle. The latest heldout ranking smoke was only
+That model can rank final boards and candidate transitions. The current
+checkpoint is useful as a research artifact, but it is not yet strong enough to
+be treated as the only reward oracle. The latest heldout ranking smoke was
 moderate: pairwise accuracy around `0.643`, Spearman around `0.407`, and top-k
 overlap around `0.50` on heldout comps.
+
+The planner now adds a symbolic target-completion layer on top of value scoring:
+
+```text
+score(candidate) = model_value(candidate)
+                 + target completion bonus
+                 - missing/off-target/duplicate penalties
+```
+
+The recurring planner regression gate is:
+
+```bash
+uv run python -m mini_tft.tools.evaluate_current_patch_planner \
+  --catalog data/metatft/current_rich_catalog_2026-05-31.json \
+  --checkpoint checkpoints/fight_value/current_patch_board_value_2026-05-31.pt \
+  --device cpu \
+  --comp-limit 8 \
+  --demo-levels 8,9 \
+  --match-levels 8,9 \
+  --top-k 10 \
+  --min-recall 0.75 \
+  --max-actions 8 \
+  --require-exact-match-rate 8:1.0 \
+  --require-exact-match-rate 9:1.0
+```
 
 ## Auto-Research Harness Direction
 

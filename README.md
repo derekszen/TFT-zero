@@ -46,30 +46,28 @@ The initial sync installs only the simulator/runtime dependencies plus the
 default dev group. Training and asset-scraping dependencies are opt-in so the
 base environment stays light.
 
-## Current Scope
+## Current Architecture
 
-v0 has two separate research tracks:
+The repo has three tracks. Keep their claims separate:
 
-- a playable Set-1-like toy simulator under `src/mini_tft/core/`
-- heuristic bots under `src/mini_tft/bots/`
-- RL, BC, PPO, and dataset helpers under `src/mini_tft/rl/`
-- current-patch MetaTFT catalog, encoder, value, and planner code under
-  `src/mini_tft/metatft/`
-- CLI/debug tools under `src/mini_tft/tools/`
-- data-driven 24-unit Set 1-labeled pack under `src/mini_tft/data/`
-- smoke tests under `tests/`
-- markdown specs under `docs/`
+| Track | What exists | What it proves |
+| --- | --- | --- |
+| Set-1-like toy simulator | `MiniTFTEnv`, bots, dataset generation, BC/PPO training | RL can learn inside the fast abstract simulator. |
+| Current-patch MetaTFT value/planner | rich MetaTFT ingest, current-patch encoder/value model, target-guided shop/econ planner | Aggregate data can score and complete symbolic current-patch boards. |
+| Fight-value teacher path | Set 4 teacher labels and `FightValueNet` experiments | Detailed combat can generate labels for a faster learned evaluator, but this is not current-patch validated. |
 
-The toy env is still not exact TFT. Combat, traits, and items are abstract power
-models designed to support fast RL iteration. The current-patch MetaTFT path is
-more realistic for board/comp value, but it is currently a value/planner layer,
-not a full turn-by-turn RL environment.
+The toy env is a complete executable `reset/step` RL environment, but it is not
+exact TFT. The current-patch MetaTFT path uses real aggregate data, but it is not
+yet a full turn-by-turn RL environment because it does not own shops, augments,
+items, combat, and episode transitions end to end.
 
 ## Documentation
 
 - [Project Brief](docs/PROJECT_BRIEF.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Branch Architecture](docs/BRANCH_ARCHITECTURE.md)
+- [Current-Patch MetaTFT](docs/CURRENT_PATCH_METATFT.md)
+- [Fight Value Model](docs/FIGHT_VALUE_MODEL.md)
 - [V0 Build Plan](docs/V0_BUILD_PLAN.md)
 - [Data Generation](docs/DATA_GENERATION.md)
 - [Training Plan](docs/TRAINING.md)
@@ -86,6 +84,16 @@ Toy Set-1-like simulator eval over seeds `1000..1499`:
 
 This is a toy-simulator result. The board-strength number comes from the
 handcrafted abstract combat model, not from MetaTFT or real player data.
+
+Current-patch planner gate on the 2026-05-31 rich MetaTFT snapshot:
+
+```text
+level 8 exact top-comp board match: 1.0
+level 9 exact top-comp board match: 1.0
+```
+
+That gate validates target-board completion for fixed planner traces. It does
+not prove organic RL policy learning.
 
 ## Development Rules
 

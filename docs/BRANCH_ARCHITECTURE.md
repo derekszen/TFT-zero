@@ -5,12 +5,12 @@ be mutually exclusive forever, but each branch should have one MVP owner.
 
 ## Branch Map
 
-| Branch | Base | Scope | Not Scope |
+| Branch | Role | Scope | Not Scope |
 | --- | --- | --- | --- |
 | `main` | integration | Stable docs and code after an MVP branch is validated | active experiments |
-| `mvp/set1-mini-env` | `76a9cdb` | Fast Set-1-like single-player simulator, abstract combat, action masks, bots as executable baselines | PPO training results, MetaTFT current-patch value modeling |
-| `mvp/set1-ppo-baseline` | `7df0ab7` | BC/PPO pipeline on top of the Set-1-like simulator, fixed-seed heuristic comparisons, training reports | real-TFT skill claims, current-patch board value |
-| `mvp/current-metatft-value-model` | `67071b8` plus current working changes | Current-patch MetaTFT catalog, encoders, value model, planner scorer, shop/econ policy shell | full turn-by-turn simulator until shop/econ/augments/combat are owned by a `reset/step` env |
+| `mvp/set1-mini-env` | toy env MVP | Fast Set-1-like single-player simulator, abstract combat, action masks, bots as executable baselines | PPO training reports, MetaTFT current-patch value modeling |
+| `mvp/set1-ppo-baseline` | toy RL MVP | BC/PPO pipeline on top of the Set-1-like simulator, fixed-seed heuristic comparisons, training reports | real-TFT skill claims, current-patch board value |
+| `mvp/current-metatft-value-model` | current-patch value/planner MVP | MetaTFT rich catalog, current-patch encoders, value model, target-guided planner, batch top-comp match gates | full turn-by-turn simulator until shop/econ/augments/combat are owned by a `reset/step` env |
 
 Existing `exp/*` and `combat/*` branches are research worktrees. Treat them as
 candidate sources for cherry-picks, not as the canonical MVP branches.
@@ -53,6 +53,18 @@ uv run python -m mini_tft.rl.evaluate_policy --episodes 100
 cd /mnt/ssd2/Projects/TFT-zero
 uv sync --extra train --extra fight
 uv run pytest -q tests/test_metatft_catalog_encoders.py
+uv run python -m mini_tft.tools.evaluate_current_patch_planner \
+  --catalog data/metatft/current_rich_catalog_2026-05-31.json \
+  --checkpoint checkpoints/fight_value/current_patch_board_value_2026-05-31.pt \
+  --device cpu \
+  --comp-limit 8 \
+  --demo-levels 8,9 \
+  --match-levels 8,9 \
+  --top-k 10 \
+  --min-recall 0.75 \
+  --max-actions 8 \
+  --require-exact-match-rate 8:1.0 \
+  --require-exact-match-rate 9:1.0
 ```
 
 Only use submodules if a component becomes a genuinely reusable external
@@ -180,6 +192,20 @@ heldout pairwise accuracy: ~0.643
 heldout Spearman:          ~0.407
 heldout top-k overlap:     ~0.50
 ```
+
+Current planner trace gate on the 2026-05-31 rich snapshot:
+
+```text
+level 8 exact_match_rate: 1.0
+level 9 exact_match_rate: 1.0
+```
+
+Interpretation:
+
+- The planner can complete target top-comp boards when the fixed trace exposes
+  the required units through board, bench, and provided shops.
+- This is a regression gate for symbolic board completion, not proof that an RL
+  agent has learned scouting, rolling, augments, items, or combat.
 
 ## Auto-Research Harness Target
 
