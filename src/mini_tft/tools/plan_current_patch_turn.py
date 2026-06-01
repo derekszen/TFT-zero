@@ -12,6 +12,7 @@ from mini_tft.metatft import (
     ShopEconPolicyConfig,
     demo_state_and_shops,
     load_catalog_from_comp_strength,
+    target_comp_units_for_level,
     top_comp_match_report,
 )
 
@@ -33,7 +34,7 @@ def main() -> None:
     comp = catalog.comp(args.comp_id) if args.comp_id else catalog.comps[0]
     state, shops = demo_state_and_shops(
         comp_id=comp.comp_id,
-        unit_keys=comp.unit_keys,
+        unit_keys=target_comp_units_for_level(comp, args.demo_level),
         level=args.demo_level,
     )
     policy = CurrentPatchShopEconPolicy.from_checkpoint(

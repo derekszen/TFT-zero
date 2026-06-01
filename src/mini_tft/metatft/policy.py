@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Protocol
 
 from mini_tft.metatft.catalog import MetaTFTCatalog
+from mini_tft.metatft.metrics import target_comp_units_for_level
 from mini_tft.metatft.planner import (
     CandidateTransition,
     CurrentPatchPlannerScorer,
@@ -15,7 +17,7 @@ from mini_tft.metatft.planner import (
     ScoredTransition,
     build_shop_bench_board_transitions,
 )
-from mini_tft.metatft.schema import MAX_LEVEL, CurrentBoardState
+from mini_tft.metatft.schema import MAX_BOARD_TOKENS, MAX_LEVEL, CurrentBoardState, CurrentBoardUnit
 
 
 class TransitionScorer(Protocol):
@@ -40,6 +42,10 @@ class ShopEconPolicyConfig:
     roll_gold_reserve: int = 20
     xp_gold_reserve: int = 8
     default_unit_cost: int = 3
+    target_completion_weight: float = 10.0
+    target_extra_penalty: float = 2.0
+    target_duplicate_penalty: float = 2.0
+    enable_target_refill: bool = True
 
 
 @dataclass(frozen=True)
@@ -59,10 +65,12 @@ class CurrentPatchShopEconPolicy:
         *,
         config: ShopEconPolicyConfig | None = None,
         unit_costs: Mapping[str, int] | None = None,
+        catalog: MetaTFTCatalog | None = None,
     ) -> None:
         self.scorer = scorer
         self.config = config or ShopEconPolicyConfig()
         self.unit_costs = dict(unit_costs or {})
+        self.catalog = catalog
 
     @classmethod
     def from_checkpoint(
@@ -80,7 +88,12 @@ class CurrentPatchShopEconPolicy:
             device_name=device_name,
             blind_target_metadata=blind_target_metadata,
         )
-        return cls(scorer, config=config, unit_costs=_catalog_unit_costs(catalog))
+        return cls(
+            scorer,
+            config=config,
+            unit_costs=_catalog_unit_costs(catalog),
+            catalog=catalog,
+        )
 
     def choose_action(
         self,
@@ -99,9 +112,10 @@ class CurrentPatchShopEconPolicy:
                 default_unit_cost=self.config.default_unit_cost,
                 include_hold=False,
             ),
+            *self._target_refill_transitions(state),
             *self._econ_transitions(state),
         ]
-        ranked = self.scorer.rank_transitions(candidates, rank_by=rank_by)
+        ranked = self._rank_transitions(candidates, rank_by=rank_by)
         if not ranked:
             raise ValueError("policy produced no legal candidate transitions")
 
@@ -110,7 +124,7 @@ class CurrentPatchShopEconPolicy:
             return best
         if self._action_type(best) == "end_turn":
             return best
-        if best.delta >= self.config.min_value_delta:
+        if best.delta >= self.config.min_value_delta or self._beats_end_turn(best, ranked):
             return best
         fallback = next(
             (candidate for candidate in ranked if self._action_type(candidate) == "end_turn"),
@@ -208,6 +222,96 @@ class CurrentPatchShopEconPolicy:
             )
         return tuple(transitions)
 
+    def _target_refill_transitions(
+        self,
+        state: CurrentBoardState,
+    ) -> tuple[CandidateTransition, ...]:
+        if not self.config.enable_target_refill:
+            return ()
+        target_units = self._target_units(state)
+        if not target_units:
+            return ()
+        board, bench = _best_target_refill(state, target_units)
+        if board == state.board and bench == state.bench:
+            return ()
+        return (
+            CandidateTransition(
+                action="target_refill_board",
+                before=state,
+                after=replace(
+                    state,
+                    board=board,
+                    bench=bench,
+                    source="policy_candidate",
+                    metadata={**state.metadata, "policy_action": "target_refill_board"},
+                ),
+                metadata={"type": "target_refill_board"},
+            ),
+        )
+
+    def _rank_transitions(
+        self,
+        candidates: Sequence[CandidateTransition],
+        *,
+        rank_by: RankBy,
+    ) -> tuple[ScoredTransition, ...]:
+        ranked = self.scorer.rank_transitions(candidates, rank_by=rank_by)
+        if not ranked or self.catalog is None or self.config.target_completion_weight <= 0:
+            return ranked
+        adjusted = []
+        for row in ranked:
+            target_score = self._target_board_score(row.transition.after)
+            adjusted.append(
+                replace(
+                    row,
+                    rank_score=row.rank_score
+                    + self.config.target_completion_weight * target_score,
+                )
+            )
+        adjusted.sort(key=lambda row: row.rank_score, reverse=True)
+        return tuple(replace(row, rank=index + 1) for index, row in enumerate(adjusted))
+
+    def _target_board_score(self, state: CurrentBoardState) -> float:
+        target_units = self._target_units(state)
+        if not target_units:
+            return 0.0
+        board_counts = Counter(state.board_unit_keys)
+        target_counts = Counter(target_units)
+        overlap = sum((board_counts & target_counts).values())
+        missing = sum((target_counts - board_counts).values())
+        extra = sum((board_counts - target_counts).values())
+        duplicate_excess = sum(
+            max(0, count - target_counts.get(unit_key, 0))
+            for unit_key, count in board_counts.items()
+        )
+        return (
+            float(overlap)
+            - self.config.target_extra_penalty * float(extra + missing)
+            - self.config.target_duplicate_penalty * float(duplicate_excess)
+        )
+
+    def _target_units(self, state: CurrentBoardState) -> tuple[str, ...]:
+        if self.catalog is None or state.target_comp_id is None:
+            return ()
+        try:
+            comp = self.catalog.comp(state.target_comp_id)
+        except KeyError:
+            return ()
+        return target_comp_units_for_level(comp, state.level)
+
+    def _beats_end_turn(
+        self,
+        best: ScoredTransition,
+        ranked: Sequence[ScoredTransition],
+    ) -> bool:
+        end_turn = next(
+            (candidate for candidate in ranked if self._action_type(candidate) == "end_turn"),
+            None,
+        )
+        if end_turn is None:
+            return False
+        return best.rank_score > end_turn.rank_score + self.config.min_value_delta
+
     def _can_buy_xp(self, state: CurrentBoardState) -> bool:
         if state.level >= self.config.max_level or state.gold < self.config.xp_buy_cost:
             return False
@@ -243,3 +347,46 @@ def _catalog_unit_costs(catalog: MetaTFTCatalog) -> dict[str, int]:
         for unit in catalog.units
         if unit.cost is not None and unit.cost > 0
     }
+
+
+def _best_target_refill(
+    state: CurrentBoardState,
+    target_units: Sequence[str],
+) -> tuple[tuple[CurrentBoardUnit, ...], tuple[CurrentBoardUnit, ...]]:
+    owned = [*state.board, *state.bench]
+    selected_indexes: set[int] = set()
+    board: list[CurrentBoardUnit] = []
+    board_limit = min(state.level, MAX_BOARD_TOKENS, len(target_units))
+
+    for target_unit in target_units[:board_limit]:
+        selected_index = _first_unused_unit_index(owned, selected_indexes, target_unit)
+        if selected_index is None:
+            continue
+        selected_indexes.add(selected_index)
+        board.append(replace(owned[selected_index], position=len(board)))
+
+    for index, unit in enumerate(owned):
+        if len(board) >= min(state.level, MAX_BOARD_TOKENS):
+            break
+        if index in selected_indexes:
+            continue
+        selected_indexes.add(index)
+        board.append(replace(unit, position=len(board)))
+
+    bench = tuple(
+        replace(unit, position=0)
+        for index, unit in enumerate(owned)
+        if index not in selected_indexes
+    )
+    return tuple(board), bench
+
+
+def _first_unused_unit_index(
+    units: Sequence[CurrentBoardUnit],
+    used_indexes: set[int],
+    unit_key: str,
+) -> int | None:
+    for index, unit in enumerate(units):
+        if index not in used_indexes and unit.unit_key == unit_key:
+            return index
+    return None

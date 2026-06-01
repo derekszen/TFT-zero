@@ -8,7 +8,11 @@ from dataclasses import dataclass
 from typing import Literal, Protocol
 
 from mini_tft.metatft.catalog import MetaTFTCatalog
-from mini_tft.metatft.metrics import TopCompMatch, top_comp_match_report
+from mini_tft.metatft.metrics import (
+    TopCompMatch,
+    target_comp_units_for_level,
+    top_comp_match_report,
+)
 from mini_tft.metatft.policy import PolicyTurnPlan
 from mini_tft.metatft.schema import CurrentBoardState, CurrentBoardUnit
 
@@ -165,7 +169,7 @@ def evaluate_planner_trace_batch(
         for demo_level in demo_level_values:
             state, shops = demo_state_and_shops(
                 comp_id=comp.comp_id,
-                unit_keys=comp.unit_keys,
+                unit_keys=target_comp_units_for_level(comp, demo_level),
                 level=demo_level,
             )
             plan = planner.plan_turn(state, shops=shops)
@@ -293,7 +297,12 @@ def _summarize_matches(
 ) -> tuple[PlannerLevelMatchSummary, ...]:
     summaries = []
     for level in levels:
-        matches = [match for trace in traces for match in trace.matches if match.level == level]
+        matches = [
+            match
+            for trace in traces
+            for match in trace.matches
+            if trace.demo_level == level and match.level == level
+        ]
         trace_count = len(matches)
         eligible_count = sum(1 for match in matches if match.eligible)
         exact_count = sum(1 for match in matches if match.exact_match)
@@ -331,7 +340,7 @@ def _summarize_exact_failures(
             (trace, match)
             for trace in traces
             for match in trace.matches
-            if match.level == level and not match.exact_match
+            if trace.demo_level == level and match.level == level and not match.exact_match
         ]
         missing = Counter(
             unit for _, match in failures for unit in match.missing_units

@@ -164,7 +164,11 @@ This scorer is intentionally one-step: it evaluates candidate successor states.
 
 `CurrentPatchShopEconPolicy` wraps the scorer in a lightweight turn loop. It
 generates candidate buy-to-bench, buy-to-board, field-bench, swap, buy-XP, roll,
-and end-turn transitions, then asks the trained value scorer to rank them.
+target-board refill, and end-turn transitions, then asks the trained value
+scorer to rank them. When `target_comp_id` and the current catalog are
+available, it adds symbolic target-comp completion pressure so missing target
+units, off-target extras, and duplicate filler do not beat a board that matches
+the selected MetaTFT stage line.
 
 ```python
 from mini_tft.metatft import CurrentPatchShopEconPolicy
@@ -244,8 +248,8 @@ uv run python -m mini_tft.tools.evaluate_current_patch_planner \
 ```
 
 Use the same command as a regression gate before changing RL rewards/search.
-The current smoke gate tracks exact matches but gates on the stable partial
-target-match baseline:
+The current smoke gate requires exact target-comp board completion at level 8
+and level 9:
 
 ```bash
 uv run python -m mini_tft.tools.evaluate_current_patch_planner \
@@ -257,8 +261,8 @@ uv run python -m mini_tft.tools.evaluate_current_patch_planner \
   --match-levels 8,9 \
   --top-k 10 \
   --min-recall 0.75 \
-  --require-good-enough-rate 8:0.60 \
-  --require-eligible-good-enough-rate 9:0.60 \
+  --require-exact-match-rate 8:1.0 \
+  --require-exact-match-rate 9:1.0 \
   --out runs/current_patch_planner_gate.json
 ```
 
@@ -268,6 +272,8 @@ debugging exact-match regressions.
 
 The batch report summarizes per-level `exact_match_rate`,
 `partial_match_rate`, `good_enough_rate`, and `eligible_good_enough_rate`.
+The summary rows compare each demo level to its matching target level, while
+the per-trace payload still includes every requested `match_level`.
 Current default threshold:
 
 ```text
@@ -277,11 +283,12 @@ good_enough = eligible and (exact_match or recall >= 0.75)
 Current exact-match investigation:
 
 ```text
-The 8-comp smoke has exact_match_count = 0 at both level 8 and level 9.
-The main blocker is not eligibility at level 8; it is unit mismatch.
-The one-step value planner can buy/swap duplicates and high-value substitutes,
-but it has no terminal constraint that forces the final board to exactly equal
-the target comp list. Level 9 also includes underleveled traces from level 8
-demo starts, so use eligible_good_enough_rate there until full level-9 planning
-is implemented.
+Previous 8-comp smoke: exact_match_count = 0 at both level 8 and level 9.
+Root cause: evaluator seeds used raw comp unit order while the metric used
+MetaTFT stage-line targets; the one-step value planner could then prefer
+duplicates or high-value substitutes.
+
+Current 8-comp smoke after target seeding + target-refill planning:
+level 8 exact_match_rate = 1.0
+level 9 exact_match_rate = 1.0
 ```

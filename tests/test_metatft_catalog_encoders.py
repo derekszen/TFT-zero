@@ -20,12 +20,14 @@ from mini_tft.metatft import (
     ScoredTransition,
     ShopEconPolicyConfig,
     build_shop_bench_board_transitions,
+    demo_state_and_shops,
     derive_stage_line_states,
     evaluate_planner_batch_gate,
     evaluate_planner_trace_batch,
     final_board_state,
     load_catalog_from_comp_strength,
     load_catalog_from_payload,
+    target_comp_units_for_level,
     top_comp_match_report,
 )
 from mini_tft.metatft.catalog import UNIT_NAMESPACE
@@ -361,6 +363,35 @@ def test_current_patch_shop_econ_policy_loops_shop_and_board_actions() -> None:
     assert plan.final_shop[0] == ""
 
 
+def test_current_patch_policy_target_refill_completes_stage_line_board() -> None:
+    catalog = load_catalog_from_payload(_rich_fixture_payload())
+    comp = catalog.comp("409003")
+    target_units = target_comp_units_for_level(comp, 8)
+    state, _ = demo_state_and_shops(
+        comp_id=comp.comp_id,
+        unit_keys=target_units,
+        level=8,
+    )
+    policy = CurrentPatchShopEconPolicy(
+        _FlatScorer(),
+        catalog=catalog,
+        config=ShopEconPolicyConfig(max_actions_per_turn=2, min_value_delta=0.0),
+    )
+
+    plan = policy.plan_turn(state, shops=())
+    report = top_comp_match_report(
+        catalog,
+        plan.final_state.board_unit_keys,
+        board_level=plan.final_state.level,
+        levels=(8,),
+        top_k=1,
+    )
+
+    assert plan.decisions[0].transition.metadata["type"] == "target_refill_board"
+    assert plan.decisions[1].transition.metadata["type"] == "end_turn"
+    assert report[0].exact_match is True
+
+
 def test_top_comp_match_report_matches_level_9_final_board() -> None:
     catalog = load_catalog_from_comp_strength(FIXTURE)
     state = final_board_state(catalog, "409003")
@@ -443,25 +474,25 @@ def test_planner_trace_batch_summarizes_level_8_and_9_match_rates() -> None:
     assert [summary.level for summary in report.summaries] == [8, 9]
 
     level_8 = report.summaries[0]
-    assert level_8.trace_count == 4
-    assert level_8.eligible_count == 4
-    assert level_8.exact_match_count == _count_matches(report.traces, 8, "exact_match")
-    assert level_8.good_enough_count == 4
+    assert level_8.trace_count == 2
+    assert level_8.eligible_count == 2
+    assert level_8.exact_match_count == 2
+    assert level_8.good_enough_count == 2
     assert level_8.good_enough_rate == pytest.approx(1.0)
 
     level_9 = report.summaries[1]
-    assert level_9.trace_count == 4
+    assert level_9.trace_count == 2
     assert level_9.eligible_count == 2
-    assert level_9.exact_match_count == _count_matches(report.traces, 9, "exact_match")
-    assert level_9.good_enough_count == _count_matches(report.traces, 9, "good_enough")
-    assert level_9.good_enough_rate == pytest.approx(0.5)
+    assert level_9.exact_match_count == 2
+    assert level_9.good_enough_count == 2
+    assert level_9.good_enough_rate == pytest.approx(1.0)
     assert level_9.eligible_good_enough_rate == pytest.approx(1.0)
 
     level_9_failures = report.exact_failure_summaries[1]
     assert level_9_failures.level == 9
     assert level_9_failures.failed_count == level_9.trace_count - level_9.exact_match_count
-    assert level_9_failures.underleveled_count == 2
-    assert level_9_failures.examples
+    assert level_9_failures.underleveled_count == 0
+    assert level_9_failures.examples == ()
 
 
 def test_planner_batch_gate_reports_threshold_failures() -> None:
@@ -498,15 +529,15 @@ def test_planner_batch_gate_reports_threshold_failures() -> None:
         report,
         (
             PlannerMetricRequirement(
-                level=9,
-                metric="good_enough_rate",
-                minimum=0.75,
+                level=10,
+                metric="exact_match_rate",
+                minimum=0.5,
             ),
         ),
     )
     assert failing_gate.passed is False
-    assert failing_gate.failures[0].level == 9
-    assert failing_gate.failures[0].actual == pytest.approx(0.5)
+    assert failing_gate.failures[0].level == 10
+    assert failing_gate.failures[0].actual == pytest.approx(0.0)
 
 
 class _TypePriorityScorer:
@@ -557,6 +588,28 @@ class _TypePriorityScorer:
         )
 
 
+class _FlatScorer:
+    def rank_transitions(
+        self,
+        transitions: list[CandidateTransition],
+        *,
+        rank_by: str = "after_value",
+    ) -> tuple[ScoredTransition, ...]:
+        del rank_by
+        return tuple(
+            ScoredTransition(
+                rank=index + 1,
+                action=transition.action,
+                after_value=0.0,
+                before_value=0.0,
+                delta=0.0,
+                rank_score=0.0,
+                transition=transition,
+            )
+            for index, transition in enumerate(transitions)
+        )
+
+
 class _FinalCompPlanner:
     def __init__(self, catalog) -> None:
         self.catalog = catalog
@@ -571,11 +624,12 @@ class _FinalCompPlanner:
     ) -> PolicyTurnPlan:
         del shops, unit_costs, rank_by
         comp = self.catalog.comp(state.target_comp_id)
+        target_units = target_comp_units_for_level(comp, state.level)
         final_state = replace(
             state,
             board=tuple(
                 CurrentBoardUnit(unit_key=unit_key, position=index)
-                for index, unit_key in enumerate(comp.unit_keys[: state.level])
+                for index, unit_key in enumerate(target_units)
             ),
             bench=(),
         )

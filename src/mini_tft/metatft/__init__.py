@@ -24,7 +24,11 @@ from mini_tft.metatft.encoders import (
     derive_stage_line_states,
     final_board_state,
 )
-from mini_tft.metatft.metrics import TopCompMatch, top_comp_match_report
+from mini_tft.metatft.metrics import (
+    TopCompMatch,
+    target_comp_units_for_level,
+    top_comp_match_report,
+)
 from mini_tft.metatft.planner import (
     CandidateTransition,
     CurrentPatchPlannerScorer,
@@ -114,6 +118,7 @@ __all__ = [
     "load_catalog_from_comp_strength",
     "load_catalog_from_payload",
     "ranking_report",
+    "target_comp_units_for_level",
     "top_comp_match_report",
     "train_current_patch_value_model",
 ]

@@ -111,7 +111,7 @@ def _score_comp_match(
     top_k: int,
     min_recall: float,
 ) -> TopCompMatch:
-    target = _target_units_for_level(comp, level)
+    target = target_comp_units_for_level(comp, level)
     overlap = _multiset_overlap(board, target)
     precision = overlap / len(board) if board else 0.0
     recall = overlap / len(target) if target else 0.0
@@ -145,7 +145,9 @@ def _score_comp_match(
     )
 
 
-def _target_units_for_level(comp: MetaTFTComp, level: int) -> tuple[str, ...]:
+def target_comp_units_for_level(comp: MetaTFTComp, level: int) -> tuple[str, ...]:
+    """Return the MetaTFT target board units for a comp at a specific level."""
+
     stage_line = _best_stage_line_for_level(comp.stage_lines, level)
     if stage_line is not None:
         return stage_line.unit_keys[:level]
