@@ -36,6 +36,11 @@ from mini_tft.metatft.value_training import (
     build_value_training_batch,
     train_current_patch_value_model,
 )
+from mini_tft.tools.run_current_patch_planner_gates import (
+    compact_gate_suite_payload,
+    mode_max_actions,
+    trace_modes_for_suite,
+)
 
 FIXTURE = Path("tests/fixtures/metatft_set17_comp_strength_2026-05-31.json")
 
@@ -582,6 +587,62 @@ def test_multi_roll_trace_requires_multiple_rolls_for_exact_match() -> None:
     assert trace.decision_action_types.count("roll") >= 2
     assert trace.decision_action_types[-1] == "end_turn"
     assert trace.matches[0].exact_match is True
+
+
+def test_planner_gate_suite_modes_and_action_defaults() -> None:
+    assert trace_modes_for_suite("minimum") == ("shop-planning",)
+    assert trace_modes_for_suite("strict") == (
+        "shop-planning",
+        "distractor-heavy",
+        "multi-roll",
+    )
+    assert trace_modes_for_suite(
+        "minimum",
+        trace_modes="distractor-heavy,multi-roll",
+    ) == ("distractor-heavy", "multi-roll")
+    assert mode_max_actions("shop-planning") == 8
+    assert mode_max_actions("multi-roll") == 10
+    assert mode_max_actions("multi-roll", override=12) == 12
+
+    with pytest.raises(ValueError, match="unsupported trace mode"):
+        trace_modes_for_suite("minimum", trace_modes="unknown")
+
+    with pytest.raises(ValueError, match="positive"):
+        mode_max_actions("shop-planning", override=0)
+
+
+def test_compact_planner_gate_suite_payload_omits_trace_samples() -> None:
+    payload = {
+        "catalog": "catalog.json",
+        "checkpoint": "checkpoint.pt",
+        "device": "cpu",
+        "suite": "minimum",
+        "trace_modes": ("shop-planning",),
+        "passed": True,
+        "failures": [],
+        "requirements": [],
+        "reports": [
+            {
+                "trace_mode": "shop-planning",
+                "max_actions": 8,
+                "gate": {"passed": True},
+                "summaries": [{"level": 8, "exact_match_rate": 1.0}],
+                "action_mix": {"buy_to_board": 4, "roll": 1, "end_turn": 1},
+                "traces": [{"large": "debug payload"}],
+            }
+        ],
+    }
+
+    compact = compact_gate_suite_payload(payload)
+
+    assert compact["passed"] is True
+    assert compact["reports"][0]["trace_mode"] == "shop-planning"
+    assert compact["reports"][0]["action_mix"] == {
+        "buy_to_board": 4,
+        "end_turn": 1,
+        "roll": 1,
+    }
+    assert "traces" not in compact["reports"][0]
 
 
 def test_planner_batch_gate_reports_threshold_failures() -> None:

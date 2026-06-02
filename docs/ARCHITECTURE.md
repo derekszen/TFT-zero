@@ -221,19 +221,17 @@ follow-up gates when changing target completion pressure, action pacing, or
 search behavior:
 
 ```bash
-uv run python -m mini_tft.tools.evaluate_current_patch_planner \
+uv run python -m mini_tft.tools.run_current_patch_planner_gates \
   --catalog data/metatft/current_rich_catalog_2026-05-31.json \
   --checkpoint checkpoints/fight_value/current_patch_board_value_2026-05-31.pt \
   --device cpu \
-  --trace-mode shop-planning \
+  --suite minimum \
   --comp-limit 8 \
   --demo-levels 8,9 \
   --match-levels 8,9 \
   --top-k 10 \
   --min-recall 0.75 \
-  --max-actions 8 \
-  --require-exact-match-rate 8:1.0 \
-  --require-exact-match-rate 9:1.0
+  --out runs/current_patch_planner_gate.json
 ```
 
 ## Auto-Research Harness Direction

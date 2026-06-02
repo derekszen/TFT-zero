@@ -249,30 +249,31 @@ uv run python -m mini_tft.tools.evaluate_current_patch_planner \
   --out runs/current_patch_planner_eval.json
 ```
 
-Use the same command as a regression gate before changing RL rewards/search.
-The completion gate requires exact target-comp board completion at level 8 and
-level 9:
+The single-mode evaluator is useful for detailed one-off reports. For recurring
+checks, use the gate suite runner. The minimum recurring gate before planner/RL
+reward/search changes runs `shop-planning` and requires exact target-comp board
+completion at level 8 and level 9:
 
 ```bash
-uv run python -m mini_tft.tools.evaluate_current_patch_planner \
-  --catalog data/metatft/current_rich_catalog.json \
-  --checkpoint checkpoints/fight_value/current_patch_board_value.pt \
-  --device cuda \
+uv run python -m mini_tft.tools.run_current_patch_planner_gates \
+  --catalog data/metatft/current_rich_catalog_2026-05-31.json \
+  --checkpoint checkpoints/fight_value/current_patch_board_value_2026-05-31.pt \
+  --device cpu \
+  --suite minimum \
   --comp-limit 8 \
   --demo-levels 8,9 \
   --match-levels 8,9 \
   --top-k 10 \
   --min-recall 0.75 \
-  --require-exact-match-rate 8:1.0 \
-  --require-exact-match-rate 9:1.0 \
   --out runs/current_patch_planner_gate.json
 ```
 
-Use the harder shop-planning gate when changing planner behavior. This mode
-starts from a partial board with no target bench, exposes only part of the
-missing target board in the first shop, and requires the policy to buy visible
-targets, roll, buy the next visible targets, and stop once the exact target
-board is complete:
+`shop-planning` starts from a partial board with no target bench, exposes only
+part of the missing target board in the first shop, and requires the policy to
+buy visible targets, roll, buy the next visible targets, and stop once the exact
+target board is complete.
+
+For a detailed single-mode report, run the underlying evaluator directly:
 
 ```bash
 uv run python -m mini_tft.tools.evaluate_current_patch_planner \
@@ -292,8 +293,7 @@ uv run python -m mini_tft.tools.evaluate_current_patch_planner \
 ```
 
 Keep `shop-planning` as the minimum recurring gate before planner/RL
-reward/search changes. For broader planning checks, use the same gate command
-with a stricter trace mode:
+reward/search changes. For broader planning checks, use the strict suite:
 
 - `--trace-mode distractor-heavy`: mixes off-target units into the target shops
   so the policy must avoid noisy shop bait.
@@ -301,23 +301,20 @@ with a stricter trace mode:
   missing target units across later shops, requiring two rolls before exact
   completion.
 
-Example multi-roll gate:
+Strict gate suite:
 
 ```bash
-uv run python -m mini_tft.tools.evaluate_current_patch_planner \
+uv run python -m mini_tft.tools.run_current_patch_planner_gates \
   --catalog data/metatft/current_rich_catalog_2026-05-31.json \
   --checkpoint checkpoints/fight_value/current_patch_board_value_2026-05-31.pt \
   --device cpu \
-  --trace-mode multi-roll \
+  --suite strict \
   --comp-limit 8 \
   --demo-levels 8,9 \
   --match-levels 8,9 \
   --top-k 10 \
   --min-recall 0.75 \
-  --max-actions 10 \
-  --require-exact-match-rate 8:1.0 \
-  --require-exact-match-rate 9:1.0 \
-  --out runs/current_patch_planner_multi_roll_gate.json
+  --out runs/current_patch_planner_strict_gate.json
 ```
 
 The command exits non-zero when a required metric drops below threshold, and
