@@ -232,7 +232,9 @@ uv run python -m mini_tft.tools.plan_current_patch_turn \
   --top-k 10
 ```
 
-For many fixed comp IDs, use the batch evaluator:
+For many fixed comp IDs, use the batch evaluator. The default
+`--trace-mode completion` tests whether the policy can finish a target board
+when the trace already contains a mostly constructed board and target bench:
 
 ```bash
 uv run python -m mini_tft.tools.evaluate_current_patch_planner \
@@ -248,8 +250,8 @@ uv run python -m mini_tft.tools.evaluate_current_patch_planner \
 ```
 
 Use the same command as a regression gate before changing RL rewards/search.
-The current smoke gate requires exact target-comp board completion at level 8
-and level 9:
+The completion gate requires exact target-comp board completion at level 8 and
+level 9:
 
 ```bash
 uv run python -m mini_tft.tools.evaluate_current_patch_planner \
@@ -266,9 +268,34 @@ uv run python -m mini_tft.tools.evaluate_current_patch_planner \
   --out runs/current_patch_planner_gate.json
 ```
 
+Use the harder shop-planning gate when changing planner behavior. This mode
+starts from a partial board with no target bench, exposes only part of the
+missing target board in the first shop, and requires the policy to buy visible
+targets, roll, buy the next visible targets, and stop once the exact target
+board is complete:
+
+```bash
+uv run python -m mini_tft.tools.evaluate_current_patch_planner \
+  --catalog data/metatft/current_rich_catalog_2026-05-31.json \
+  --checkpoint checkpoints/fight_value/current_patch_board_value_2026-05-31.pt \
+  --device cpu \
+  --trace-mode shop-planning \
+  --comp-limit 8 \
+  --demo-levels 8,9 \
+  --match-levels 8,9 \
+  --top-k 10 \
+  --min-recall 0.75 \
+  --max-actions 8 \
+  --require-exact-match-rate 8:1.0 \
+  --require-exact-match-rate 9:1.0 \
+  --out runs/current_patch_planner_hard_gate.json
+```
+
 The command exits non-zero when a required metric drops below threshold, and
 the JSON report includes `gate.failures` plus `exact_failure_summaries` for
-debugging exact-match regressions.
+debugging exact-match regressions. Reports also include `trace_mode`,
+`decision_actions`, and `decision_action_types` so regressions can distinguish
+between direct target-board refill and actual shop/roll planning.
 
 The batch report summarizes per-level `exact_match_rate`,
 `partial_match_rate`, `good_enough_rate`, and `eligible_good_enough_rate`.
@@ -288,7 +315,12 @@ Root cause: evaluator seeds used raw comp unit order while the metric used
 MetaTFT stage-line targets; the one-step value planner could then prefer
 duplicates or high-value substitutes.
 
-Current 8-comp smoke after target seeding + target-refill planning:
+Current 8-comp completion gate after target seeding + target-refill planning:
 level 8 exact_match_rate = 1.0
 level 9 exact_match_rate = 1.0
+
+Current 8-comp hard shop-planning gate:
+level 8 exact_match_rate = 1.0
+level 9 exact_match_rate = 1.0
+hard action mix over 16 traces: 64 buy_to_board, 16 roll, 16 end_turn
 ```

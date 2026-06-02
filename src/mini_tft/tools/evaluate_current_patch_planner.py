@@ -29,6 +29,12 @@ def main() -> None:
     parser.add_argument("--comp-limit", type=int, default=16)
     parser.add_argument("--demo-levels", default="8,9")
     parser.add_argument("--match-levels", default="8,9")
+    parser.add_argument(
+        "--trace-mode",
+        choices=("completion", "shop-planning"),
+        default="completion",
+        help="Regression trace generator to use.",
+    )
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--min-recall", type=float, default=0.75)
     parser.add_argument("--max-actions", type=int, default=8)
@@ -79,6 +85,7 @@ def main() -> None:
         match_levels=_parse_ints(args.match_levels, "--match-levels"),
         top_k=args.top_k,
         min_recall=args.min_recall,
+        trace_mode=args.trace_mode,
     )
     gate = evaluate_planner_batch_gate(
         report,

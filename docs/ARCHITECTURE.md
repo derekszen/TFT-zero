@@ -205,13 +205,22 @@ score(candidate) = model_value(candidate)
                  - missing/off-target/duplicate penalties
 ```
 
-The recurring planner regression gate is:
+There are two planner gates:
+
+- `completion`: verifies target board assembly when the trace already contains
+  target bench support.
+- `shop-planning`: starts from a partial board with no target bench and checks
+  visible shop buys, rolling, and stopping after exact completion.
+
+Use `shop-planning` as the recurring regression gate before planner or
+reward/search changes:
 
 ```bash
 uv run python -m mini_tft.tools.evaluate_current_patch_planner \
   --catalog data/metatft/current_rich_catalog_2026-05-31.json \
   --checkpoint checkpoints/fight_value/current_patch_board_value_2026-05-31.pt \
   --device cpu \
+  --trace-mode shop-planning \
   --comp-limit 8 \
   --demo-levels 8,9 \
   --match-levels 8,9 \

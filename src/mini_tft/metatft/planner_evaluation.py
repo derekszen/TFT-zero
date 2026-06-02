@@ -29,6 +29,9 @@ class TurnPlanner(Protocol):
         """Return a deterministic turn plan for a current-patch state."""
 
 
+PlannerTraceMode = Literal["completion", "shop-planning"]
+
+
 @dataclass(frozen=True)
 class PlannerTraceEvaluation:
     comp_id: str
@@ -38,6 +41,8 @@ class PlannerTraceEvaluation:
     final_level: int
     stopped: bool
     decisions_count: int
+    decision_actions: tuple[str, ...]
+    decision_action_types: tuple[str, ...]
     initial_board: tuple[str, ...]
     final_board: tuple[str, ...]
     matches: tuple[TopCompMatch, ...]
@@ -129,6 +134,7 @@ class PlannerGateResult:
 @dataclass(frozen=True)
 class PlannerBatchEvaluation:
     comp_ids: tuple[str, ...]
+    trace_mode: PlannerTraceMode
     demo_levels: tuple[int, ...]
     match_levels: tuple[int, ...]
     top_k: int
@@ -148,6 +154,7 @@ def evaluate_planner_trace_batch(
     match_levels: Sequence[int] = (8, 9),
     top_k: int = 10,
     min_recall: float = 0.75,
+    trace_mode: PlannerTraceMode = "completion",
 ) -> PlannerBatchEvaluation:
     """Run deterministic planner traces and summarize top-comp match rates."""
 
@@ -156,6 +163,7 @@ def evaluate_planner_trace_batch(
     if not 0.0 <= min_recall <= 1.0:
         raise ValueError("min_recall must be in [0, 1]")
     selected_comp_ids = _select_comp_ids(catalog, comp_ids, comp_limit)
+    _validate_trace_mode(trace_mode)
     demo_level_values = tuple(demo_levels)
     match_level_values = tuple(match_levels)
     if not demo_level_values:
@@ -167,10 +175,11 @@ def evaluate_planner_trace_batch(
     for comp_id in selected_comp_ids:
         comp = catalog.comp(comp_id)
         for demo_level in demo_level_values:
-            state, shops = demo_state_and_shops(
+            state, shops = planner_trace_state_and_shops(
                 comp_id=comp.comp_id,
                 unit_keys=target_comp_units_for_level(comp, demo_level),
                 level=demo_level,
+                trace_mode=trace_mode,
             )
             plan = planner.plan_turn(state, shops=shops)
             matches = top_comp_match_report(
@@ -190,6 +199,11 @@ def evaluate_planner_trace_batch(
                     final_level=plan.final_state.level,
                     stopped=plan.stopped,
                     decisions_count=len(plan.decisions),
+                    decision_actions=tuple(decision.action for decision in plan.decisions),
+                    decision_action_types=tuple(
+                        str(decision.transition.metadata.get("type", "unknown"))
+                        for decision in plan.decisions
+                    ),
                     initial_board=state.board_unit_keys,
                     final_board=plan.final_state.board_unit_keys,
                     matches=matches,
@@ -198,6 +212,7 @@ def evaluate_planner_trace_batch(
 
     return PlannerBatchEvaluation(
         comp_ids=selected_comp_ids,
+        trace_mode=trace_mode,
         demo_levels=demo_level_values,
         match_levels=match_level_values,
         top_k=top_k,
@@ -271,6 +286,67 @@ def demo_state_and_shops(
     return state, (tuple(first_shop), tuple(second_shop))
 
 
+def planner_trace_state_and_shops(
+    *,
+    comp_id: str,
+    unit_keys: tuple[str, ...],
+    level: int,
+    trace_mode: PlannerTraceMode,
+) -> tuple[CurrentBoardState, tuple[tuple[str, ...], ...]]:
+    """Build a deterministic trace seed for a planner regression mode."""
+
+    _validate_trace_mode(trace_mode)
+    if trace_mode == "completion":
+        return demo_state_and_shops(
+            comp_id=comp_id,
+            unit_keys=unit_keys,
+            level=level,
+        )
+    return hard_shop_state_and_shops(
+        comp_id=comp_id,
+        unit_keys=unit_keys,
+        level=level,
+    )
+
+
+def hard_shop_state_and_shops(
+    *,
+    comp_id: str,
+    unit_keys: tuple[str, ...],
+    level: int,
+) -> tuple[CurrentBoardState, tuple[tuple[str, ...], ...]]:
+    """Build a trace that requires buying missing target units across shops."""
+
+    if level < 1:
+        raise ValueError("level must be positive")
+    if not unit_keys:
+        raise ValueError("unit_keys must include at least one unit")
+    board_count = max(1, min(len(unit_keys), max(1, level - 4)))
+    board_units = unit_keys[:board_count]
+    missing_units = unit_keys[board_count:level]
+    first_missing_count = max(1, min(2, len(missing_units)))
+    first_shop = _pad_shop(missing_units[:first_missing_count], board_units)
+    second_shop = _pad_shop(
+        missing_units[first_missing_count:],
+        board_units[::-1],
+    )
+    state = CurrentBoardState(
+        stage=4 if level >= 8 else 3,
+        stage_round=2,
+        level=level,
+        gold=40,
+        board=tuple(
+            CurrentBoardUnit(unit_key=unit_key, position=index)
+            for index, unit_key in enumerate(board_units)
+        ),
+        bench=(),
+        target_comp_id=comp_id,
+        source="current_patch_policy_hard_eval",
+        metadata={"line": "policy_hard_eval"},
+    )
+    return state, (first_shop, second_shop)
+
+
 def _select_comp_ids(
     catalog: MetaTFTCatalog,
     comp_ids: Sequence[str] | None,
@@ -289,6 +365,26 @@ def _select_comp_ids(
     for comp_id in selected:
         catalog.comp(comp_id)
     return selected
+
+
+def _validate_trace_mode(trace_mode: str) -> None:
+    if trace_mode not in {"completion", "shop-planning"}:
+        raise ValueError("trace_mode must be 'completion' or 'shop-planning'")
+
+
+def _pad_shop(
+    priority_units: Sequence[str],
+    filler_units: Sequence[str],
+    *,
+    size: int = 5,
+) -> tuple[str, ...]:
+    shop = [unit_key for unit_key in priority_units if unit_key][:size]
+    filler = tuple(unit_key for unit_key in filler_units if unit_key) or tuple(shop)
+    cursor = 0
+    while len(shop) < size and filler:
+        shop.append(filler[cursor % len(filler)])
+        cursor += 1
+    return tuple(shop)
 
 
 def _summarize_matches(

@@ -17,7 +17,12 @@ from mini_tft.metatft.planner import (
     ScoredTransition,
     build_shop_bench_board_transitions,
 )
-from mini_tft.metatft.schema import MAX_BOARD_TOKENS, MAX_LEVEL, CurrentBoardState, CurrentBoardUnit
+from mini_tft.metatft.schema import (
+    MAX_BOARD_TOKENS,
+    MAX_LEVEL,
+    CurrentBoardState,
+    CurrentBoardUnit,
+)
 
 
 class TransitionScorer(Protocol):
@@ -46,6 +51,7 @@ class ShopEconPolicyConfig:
     target_extra_penalty: float = 2.0
     target_duplicate_penalty: float = 2.0
     enable_target_refill: bool = True
+    roll_for_missing_targets: bool = True
 
 
 @dataclass(frozen=True)
@@ -118,6 +124,22 @@ class CurrentPatchShopEconPolicy:
         ranked = self._rank_transitions(candidates, rank_by=rank_by)
         if not ranked:
             raise ValueError("policy produced no legal candidate transitions")
+
+        if self._target_board_is_exact(state):
+            end_turn = next(
+                (candidate for candidate in ranked if self._action_type(candidate) == "end_turn"),
+                None,
+            )
+            if end_turn is not None:
+                return end_turn
+
+        if self._should_roll_for_missing_targets(state, shop_unit_keys):
+            roll = next(
+                (candidate for candidate in ranked if self._action_type(candidate) == "roll"),
+                None,
+            )
+            if roll is not None:
+                return roll
 
         best = ranked[0]
         if self._action_type(best) in {"buy_xp", "roll"}:
@@ -298,6 +320,33 @@ class CurrentPatchShopEconPolicy:
         except KeyError:
             return ()
         return target_comp_units_for_level(comp, state.level)
+
+    def _should_roll_for_missing_targets(
+        self,
+        state: CurrentBoardState,
+        shop_unit_keys: Sequence[str],
+    ) -> bool:
+        if not self.config.roll_for_missing_targets or not self._can_roll(state):
+            return False
+        missing = self._missing_owned_target_units(state)
+        if not missing:
+            return False
+        missing_counts = Counter(missing)
+        return not any(missing_counts.get(unit_key, 0) > 0 for unit_key in shop_unit_keys)
+
+    def _missing_owned_target_units(self, state: CurrentBoardState) -> tuple[str, ...]:
+        target_units = self._target_units(state)
+        if not target_units:
+            return ()
+        target_counts = Counter(target_units)
+        owned_counts = Counter((*state.board_unit_keys, *(unit.unit_key for unit in state.bench)))
+        return tuple((target_counts - owned_counts).elements())
+
+    def _target_board_is_exact(self, state: CurrentBoardState) -> bool:
+        target_units = self._target_units(state)
+        if not target_units:
+            return False
+        return Counter(state.board_unit_keys) == Counter(target_units)
 
     def _beats_end_turn(
         self,

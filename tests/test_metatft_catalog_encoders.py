@@ -495,6 +495,36 @@ def test_planner_trace_batch_summarizes_level_8_and_9_match_rates() -> None:
     assert level_9_failures.examples == ()
 
 
+def test_shop_planning_trace_requires_shop_actions_for_exact_matches() -> None:
+    catalog = load_catalog_from_comp_strength(FIXTURE)
+    policy = CurrentPatchShopEconPolicy(
+        _FlatScorer(),
+        catalog=catalog,
+        config=ShopEconPolicyConfig(max_actions_per_turn=8, min_value_delta=0.0),
+    )
+
+    report = evaluate_planner_trace_batch(
+        catalog,
+        policy,
+        comp_ids=("409003",),
+        demo_levels=(8,),
+        match_levels=(8,),
+        top_k=16,
+        min_recall=0.75,
+        trace_mode="shop-planning",
+    )
+
+    trace = report.traces[0]
+    assert trace.decision_action_types.count("buy_to_board") >= 2
+    assert "roll" in trace.decision_action_types
+    assert trace.decision_action_types[-1] == "end_turn"
+    assert trace.matches[0].exact_match is True
+
+    summary = report.summaries[0]
+    assert summary.trace_count == 1
+    assert summary.exact_match_rate == pytest.approx(1.0)
+
+
 def test_planner_batch_gate_reports_threshold_failures() -> None:
     catalog = load_catalog_from_comp_strength(FIXTURE)
     report = evaluate_planner_trace_batch(

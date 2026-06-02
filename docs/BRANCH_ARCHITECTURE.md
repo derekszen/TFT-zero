@@ -57,6 +57,7 @@ uv run python -m mini_tft.tools.evaluate_current_patch_planner \
   --catalog data/metatft/current_rich_catalog_2026-05-31.json \
   --checkpoint checkpoints/fight_value/current_patch_board_value_2026-05-31.pt \
   --device cpu \
+  --trace-mode shop-planning \
   --comp-limit 8 \
   --demo-levels 8,9 \
   --match-levels 8,9 \
@@ -198,12 +199,14 @@ Current planner trace gate on the 2026-05-31 rich snapshot:
 ```text
 level 8 exact_match_rate: 1.0
 level 9 exact_match_rate: 1.0
+hard shop-planning action mix over 16 traces:
+  64 buy_to_board, 16 roll, 16 end_turn
 ```
 
 Interpretation:
 
-- The planner can complete target top-comp boards when the fixed trace exposes
-  the required units through board, bench, and provided shops.
+- The planner can complete target top-comp boards in the hard gate when a fixed
+  trace exposes missing target units across two shops.
 - This is a regression gate for symbolic board completion, not proof that an RL
   agent has learned scouting, rolling, augments, items, or combat.
 
