@@ -29,7 +29,18 @@ class TurnPlanner(Protocol):
         """Return a deterministic turn plan for a current-patch state."""
 
 
-PlannerTraceMode = Literal["completion", "shop-planning"]
+PlannerTraceMode = Literal[
+    "completion",
+    "shop-planning",
+    "distractor-heavy",
+    "multi-roll",
+]
+PLANNER_TRACE_MODES: tuple[str, ...] = (
+    "completion",
+    "shop-planning",
+    "distractor-heavy",
+    "multi-roll",
+)
 
 
 @dataclass(frozen=True)
@@ -176,6 +187,7 @@ def evaluate_planner_trace_batch(
         comp = catalog.comp(comp_id)
         for demo_level in demo_level_values:
             state, shops = planner_trace_state_and_shops(
+                catalog=catalog,
                 comp_id=comp.comp_id,
                 unit_keys=target_comp_units_for_level(comp, demo_level),
                 level=demo_level,
@@ -288,6 +300,7 @@ def demo_state_and_shops(
 
 def planner_trace_state_and_shops(
     *,
+    catalog: MetaTFTCatalog | None = None,
     comp_id: str,
     unit_keys: tuple[str, ...],
     level: int,
@@ -302,7 +315,23 @@ def planner_trace_state_and_shops(
             unit_keys=unit_keys,
             level=level,
         )
-    return hard_shop_state_and_shops(
+    if trace_mode == "shop-planning":
+        return hard_shop_state_and_shops(
+            comp_id=comp_id,
+            unit_keys=unit_keys,
+            level=level,
+        )
+    if catalog is None:
+        raise ValueError(f"{trace_mode} trace mode requires a catalog")
+    if trace_mode == "distractor-heavy":
+        return distractor_heavy_state_and_shops(
+            catalog=catalog,
+            comp_id=comp_id,
+            unit_keys=unit_keys,
+            level=level,
+        )
+    return multi_roll_state_and_shops(
+        catalog=catalog,
         comp_id=comp_id,
         unit_keys=unit_keys,
         level=level,
@@ -317,34 +346,79 @@ def hard_shop_state_and_shops(
 ) -> tuple[CurrentBoardState, tuple[tuple[str, ...], ...]]:
     """Build a trace that requires buying missing target units across shops."""
 
-    if level < 1:
-        raise ValueError("level must be positive")
-    if not unit_keys:
-        raise ValueError("unit_keys must include at least one unit")
-    board_count = max(1, min(len(unit_keys), max(1, level - 4)))
-    board_units = unit_keys[:board_count]
-    missing_units = unit_keys[board_count:level]
+    board_units, missing_units = _hard_trace_parts(unit_keys=unit_keys, level=level)
     first_missing_count = max(1, min(2, len(missing_units)))
     first_shop = _pad_shop(missing_units[:first_missing_count], board_units)
     second_shop = _pad_shop(
         missing_units[first_missing_count:],
         board_units[::-1],
     )
-    state = CurrentBoardState(
-        stage=4 if level >= 8 else 3,
-        stage_round=2,
+    state = _hard_trace_state(
+        comp_id=comp_id,
         level=level,
+        board_units=board_units,
         gold=40,
-        board=tuple(
-            CurrentBoardUnit(unit_key=unit_key, position=index)
-            for index, unit_key in enumerate(board_units)
-        ),
-        bench=(),
-        target_comp_id=comp_id,
         source="current_patch_policy_hard_eval",
-        metadata={"line": "policy_hard_eval"},
+        line="policy_hard_eval",
     )
     return state, (first_shop, second_shop)
+
+
+def distractor_heavy_state_and_shops(
+    *,
+    catalog: MetaTFTCatalog,
+    comp_id: str,
+    unit_keys: tuple[str, ...],
+    level: int,
+) -> tuple[CurrentBoardState, tuple[tuple[str, ...], ...]]:
+    """Build a trace with off-target shop distractors around visible targets."""
+
+    board_units, missing_units = _hard_trace_parts(unit_keys=unit_keys, level=level)
+    distractors = _distractor_units(catalog, unit_keys)
+    first_target_count = min(1, len(missing_units))
+    first_shop = _pad_shop(
+        missing_units[:first_target_count],
+        distractors,
+    )
+    second_shop = _pad_shop(
+        missing_units[first_target_count:],
+        _rotate(distractors, 5),
+    )
+    state = _hard_trace_state(
+        comp_id=comp_id,
+        level=level,
+        board_units=board_units,
+        gold=44,
+        source="current_patch_policy_distractor_eval",
+        line="policy_distractor_eval",
+    )
+    return state, (first_shop, second_shop)
+
+
+def multi_roll_state_and_shops(
+    *,
+    catalog: MetaTFTCatalog,
+    comp_id: str,
+    unit_keys: tuple[str, ...],
+    level: int,
+) -> tuple[CurrentBoardState, tuple[tuple[str, ...], ...]]:
+    """Build a trace that requires skipping a bad shop and rolling twice."""
+
+    board_units, missing_units = _hard_trace_parts(unit_keys=unit_keys, level=level)
+    distractors = _distractor_units(catalog, unit_keys)
+    split = max(1, len(missing_units) // 2)
+    first_shop = _pad_shop((), distractors)
+    second_shop = _pad_shop(missing_units[:split], _rotate(distractors, 5))
+    third_shop = _pad_shop(missing_units[split:], _rotate(distractors, 10))
+    state = _hard_trace_state(
+        comp_id=comp_id,
+        level=level,
+        board_units=board_units,
+        gold=50,
+        source="current_patch_policy_multi_roll_eval",
+        line="policy_multi_roll_eval",
+    )
+    return state, (first_shop, second_shop, third_shop)
 
 
 def _select_comp_ids(
@@ -368,8 +442,68 @@ def _select_comp_ids(
 
 
 def _validate_trace_mode(trace_mode: str) -> None:
-    if trace_mode not in {"completion", "shop-planning"}:
-        raise ValueError("trace_mode must be 'completion' or 'shop-planning'")
+    if trace_mode not in PLANNER_TRACE_MODES:
+        supported = ", ".join(PLANNER_TRACE_MODES)
+        raise ValueError(f"trace_mode must be one of: {supported}")
+
+
+def _hard_trace_parts(
+    *,
+    unit_keys: tuple[str, ...],
+    level: int,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    if level < 1:
+        raise ValueError("level must be positive")
+    if not unit_keys:
+        raise ValueError("unit_keys must include at least one unit")
+    board_count = max(1, min(len(unit_keys), max(1, level - 4)))
+    board_units = unit_keys[:board_count]
+    missing_units = unit_keys[board_count:level]
+    return board_units, missing_units
+
+
+def _hard_trace_state(
+    *,
+    comp_id: str,
+    level: int,
+    board_units: Sequence[str],
+    gold: int,
+    source: str,
+    line: str,
+) -> CurrentBoardState:
+    return CurrentBoardState(
+        stage=4 if level >= 8 else 3,
+        stage_round=2,
+        level=level,
+        gold=gold,
+        board=tuple(
+            CurrentBoardUnit(unit_key=unit_key, position=index)
+            for index, unit_key in enumerate(board_units)
+        ),
+        bench=(),
+        target_comp_id=comp_id,
+        source=source,
+        metadata={"line": line},
+    )
+
+
+def _distractor_units(
+    catalog: MetaTFTCatalog,
+    target_units: Sequence[str],
+) -> tuple[str, ...]:
+    target_unit_set = set(target_units)
+    distractors = tuple(
+        unit.key for unit in catalog.units if unit.key not in target_unit_set
+    )
+    return distractors or tuple(unit for unit in target_units if unit)
+
+
+def _rotate(units: Sequence[str], offset: int) -> tuple[str, ...]:
+    values = tuple(units)
+    if not values:
+        return ()
+    index = offset % len(values)
+    return values[index:] + values[:index]
 
 
 def _pad_shop(

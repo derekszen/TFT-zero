@@ -36,6 +36,7 @@ from mini_tft.metatft.planner import (
     build_shop_bench_board_transitions,
 )
 from mini_tft.metatft.planner_evaluation import (
+    PLANNER_TRACE_MODES,
     PlannerBatchEvaluation,
     PlannerExactFailureExample,
     PlannerExactFailureSummary,
@@ -48,9 +49,11 @@ from mini_tft.metatft.planner_evaluation import (
     PlannerTraceMode,
     PlannerUnitFrequency,
     demo_state_and_shops,
+    distractor_heavy_state_and_shops,
     evaluate_planner_batch_gate,
     evaluate_planner_trace_batch,
     hard_shop_state_and_shops,
+    multi_roll_state_and_shops,
     planner_trace_state_and_shops,
 )
 from mini_tft.metatft.policy import (
@@ -92,6 +95,7 @@ __all__ = [
     "EncodedStageLine",
     "MetaTFTCatalog",
     "MetaTFTComp",
+    "PLANNER_TRACE_MODES",
     "PlannerBatchEvaluation",
     "PlannerExactFailureExample",
     "PlannerExactFailureSummary",
@@ -115,6 +119,7 @@ __all__ = [
     "build_shop_bench_board_transitions",
     "build_value_training_batch",
     "demo_state_and_shops",
+    "distractor_heavy_state_and_shops",
     "derive_stage_line_states",
     "evaluate_planner_batch_gate",
     "evaluate_planner_trace_batch",
@@ -122,6 +127,7 @@ __all__ = [
     "hard_shop_state_and_shops",
     "load_catalog_from_comp_strength",
     "load_catalog_from_payload",
+    "multi_roll_state_and_shops",
     "planner_trace_state_and_shops",
     "ranking_report",
     "target_comp_units_for_level",

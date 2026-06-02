@@ -525,6 +525,65 @@ def test_shop_planning_trace_requires_shop_actions_for_exact_matches() -> None:
     assert summary.exact_match_rate == pytest.approx(1.0)
 
 
+def test_distractor_heavy_trace_ignores_off_target_shop_units() -> None:
+    catalog = load_catalog_from_comp_strength(FIXTURE)
+    policy = CurrentPatchShopEconPolicy(
+        _FlatScorer(),
+        catalog=catalog,
+        config=ShopEconPolicyConfig(max_actions_per_turn=8, min_value_delta=0.0),
+    )
+
+    report = evaluate_planner_trace_batch(
+        catalog,
+        policy,
+        comp_ids=("409003",),
+        demo_levels=(8,),
+        match_levels=(8,),
+        top_k=16,
+        min_recall=0.75,
+        trace_mode="distractor-heavy",
+    )
+
+    trace = report.traces[0]
+    target_units = target_comp_units_for_level(catalog.comp(trace.comp_id), 8)
+    bought_units = tuple(
+        action.split(":", maxsplit=1)[1]
+        for action in trace.decision_actions
+        if action.startswith("buy_shop_")
+    )
+
+    assert trace.decision_action_types.count("buy_to_board") >= 2
+    assert "roll" in trace.decision_action_types
+    assert set(bought_units).issubset(set(target_units))
+    assert trace.matches[0].exact_match is True
+
+
+def test_multi_roll_trace_requires_multiple_rolls_for_exact_match() -> None:
+    catalog = load_catalog_from_comp_strength(FIXTURE)
+    policy = CurrentPatchShopEconPolicy(
+        _FlatScorer(),
+        catalog=catalog,
+        config=ShopEconPolicyConfig(max_actions_per_turn=10, min_value_delta=0.0),
+    )
+
+    report = evaluate_planner_trace_batch(
+        catalog,
+        policy,
+        comp_ids=("409003",),
+        demo_levels=(8,),
+        match_levels=(8,),
+        top_k=16,
+        min_recall=0.75,
+        trace_mode="multi-roll",
+    )
+
+    trace = report.traces[0]
+    assert trace.decision_action_types[0] == "roll"
+    assert trace.decision_action_types.count("roll") >= 2
+    assert trace.decision_action_types[-1] == "end_turn"
+    assert trace.matches[0].exact_match is True
+
+
 def test_planner_batch_gate_reports_threshold_failures() -> None:
     catalog = load_catalog_from_comp_strength(FIXTURE)
     report = evaluate_planner_trace_batch(

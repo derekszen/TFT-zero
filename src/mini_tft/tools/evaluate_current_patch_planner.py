@@ -10,6 +10,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from mini_tft.metatft import (
+    PLANNER_TRACE_MODES,
     CurrentPatchShopEconPolicy,
     PlannerGateMetric,
     PlannerMetricRequirement,
@@ -31,7 +32,7 @@ def main() -> None:
     parser.add_argument("--match-levels", default="8,9")
     parser.add_argument(
         "--trace-mode",
-        choices=("completion", "shop-planning"),
+        choices=PLANNER_TRACE_MODES,
         default="completion",
         help="Regression trace generator to use.",
     )

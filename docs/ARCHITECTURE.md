@@ -205,15 +205,20 @@ score(candidate) = model_value(candidate)
                  - missing/off-target/duplicate penalties
 ```
 
-There are two planner gates:
+There are four planner trace modes:
 
 - `completion`: verifies target board assembly when the trace already contains
   target bench support.
 - `shop-planning`: starts from a partial board with no target bench and checks
   visible shop buys, rolling, and stopping after exact completion.
+- `distractor-heavy`: adds off-target shop units around visible targets.
+- `multi-roll`: starts with an off-target shop and splits missing target units
+  across later shops, requiring multiple rolls.
 
 Use `shop-planning` as the recurring regression gate before planner or
-reward/search changes:
+reward/search changes. Use `distractor-heavy` or `multi-roll` as stricter
+follow-up gates when changing target completion pressure, action pacing, or
+search behavior:
 
 ```bash
 uv run python -m mini_tft.tools.evaluate_current_patch_planner \

@@ -197,16 +197,27 @@ heldout top-k overlap:     ~0.50
 Current planner trace gate on the 2026-05-31 rich snapshot:
 
 ```text
-level 8 exact_match_rate: 1.0
-level 9 exact_match_rate: 1.0
-hard shop-planning action mix over 16 traces:
-  64 buy_to_board, 16 roll, 16 end_turn
+shop-planning:
+  level 8 exact_match_rate: 1.0
+  level 9 exact_match_rate: 1.0
+  action mix over 16 traces: 64 buy_to_board, 16 roll, 16 end_turn
+
+distractor-heavy:
+  level 8 exact_match_rate: 1.0
+  level 9 exact_match_rate: 1.0
+  action mix over 16 traces: 64 buy_to_board, 16 roll, 16 end_turn
+
+multi-roll:
+  level 8 exact_match_rate: 1.0
+  level 9 exact_match_rate: 1.0
+  action mix over 16 traces: 64 buy_to_board, 32 roll, 16 end_turn
 ```
 
 Interpretation:
 
-- The planner can complete target top-comp boards in the hard gate when a fixed
-  trace exposes missing target units across two shops.
+- The planner can complete target top-comp boards in fixed traces that expose
+  missing target units across clean shops, noisy off-target shops, and multiple
+  roll steps.
 - This is a regression gate for symbolic board completion, not proof that an RL
   agent has learned scouting, rolling, augments, items, or combat.
 

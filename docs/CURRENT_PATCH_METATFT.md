@@ -291,6 +291,35 @@ uv run python -m mini_tft.tools.evaluate_current_patch_planner \
   --out runs/current_patch_planner_hard_gate.json
 ```
 
+Keep `shop-planning` as the minimum recurring gate before planner/RL
+reward/search changes. For broader planning checks, use the same gate command
+with a stricter trace mode:
+
+- `--trace-mode distractor-heavy`: mixes off-target units into the target shops
+  so the policy must avoid noisy shop bait.
+- `--trace-mode multi-roll`: starts with a fully off-target shop and splits
+  missing target units across later shops, requiring two rolls before exact
+  completion.
+
+Example multi-roll gate:
+
+```bash
+uv run python -m mini_tft.tools.evaluate_current_patch_planner \
+  --catalog data/metatft/current_rich_catalog_2026-05-31.json \
+  --checkpoint checkpoints/fight_value/current_patch_board_value_2026-05-31.pt \
+  --device cpu \
+  --trace-mode multi-roll \
+  --comp-limit 8 \
+  --demo-levels 8,9 \
+  --match-levels 8,9 \
+  --top-k 10 \
+  --min-recall 0.75 \
+  --max-actions 10 \
+  --require-exact-match-rate 8:1.0 \
+  --require-exact-match-rate 9:1.0 \
+  --out runs/current_patch_planner_multi_roll_gate.json
+```
+
 The command exits non-zero when a required metric drops below threshold, and
 the JSON report includes `gate.failures` plus `exact_failure_summaries` for
 debugging exact-match regressions. Reports also include `trace_mode`,
@@ -323,4 +352,14 @@ Current 8-comp hard shop-planning gate:
 level 8 exact_match_rate = 1.0
 level 9 exact_match_rate = 1.0
 hard action mix over 16 traces: 64 buy_to_board, 16 roll, 16 end_turn
+
+Current 8-comp distractor-heavy gate:
+level 8 exact_match_rate = 1.0
+level 9 exact_match_rate = 1.0
+distractor action mix over 16 traces: 64 buy_to_board, 16 roll, 16 end_turn
+
+Current 8-comp multi-roll gate:
+level 8 exact_match_rate = 1.0
+level 9 exact_match_rate = 1.0
+multi-roll action mix over 16 traces: 64 buy_to_board, 32 roll, 16 end_turn
 ```
