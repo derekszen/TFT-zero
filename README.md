@@ -48,7 +48,9 @@ base environment stays light.
 
 ## Current Architecture
 
-The repo has three tracks. Keep their claims separate:
+The project has one top-level goal: learn TFT-like planning, then ground that
+planning in real current-patch board strength. The repo is split into three
+tracks so we do not confuse toy-RL progress with real-TFT claims:
 
 | Track | What exists | What it proves |
 | --- | --- | --- |
@@ -61,11 +63,30 @@ exact TFT. The current-patch MetaTFT path uses real aggregate data, but it is no
 yet a full turn-by-turn RL environment because it does not own shops, augments,
 items, combat, and episode transitions end to end.
 
+Intuitively:
+
+```text
+Toy simulator
+  -> fast RL sandbox for shop/econ/board mechanics
+
+MetaTFT current-patch value model
+  -> real aggregate-data board strength and comp-ranking layer
+
+Current-patch planner gates
+  -> controlled tests that the planner can assemble top comps through shops,
+     distractors, and multiple rolls
+
+Future current-patch RL environment
+  -> the missing bridge: stochastic shops/econ/augments/items/combat/rewards
+     around the current-patch value layer
+```
+
 ## Documentation
 
 - [Project Brief](docs/PROJECT_BRIEF.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Branch Architecture](docs/BRANCH_ARCHITECTURE.md)
+- [Simulator Roadmap](docs/SIMULATOR_ROADMAP.md)
 - [Current-Patch MetaTFT](docs/CURRENT_PATCH_METATFT.md)
 - [Fight Value Model](docs/FIGHT_VALUE_MODEL.md)
 - [V0 Build Plan](docs/V0_BUILD_PLAN.md)
@@ -88,12 +109,35 @@ handcrafted abstract combat model, not from MetaTFT or real player data.
 Current-patch planner gate on the 2026-05-31 rich MetaTFT snapshot:
 
 ```text
-level 8 exact top-comp board match: 1.0
-level 9 exact top-comp board match: 1.0
+shop-planning:     level 8/9 exact match = 1.0
+distractor-heavy:  level 8/9 exact match = 1.0
+multi-roll:        level 8/9 exact match = 1.0
 ```
 
 That gate validates target-board completion for fixed planner traces. It does
-not prove organic RL policy learning.
+not prove organic RL policy learning, scouting, augment choice, item choice, or
+real combat.
+
+Before planner/RL reward/search changes, run:
+
+```bash
+uv run python -m mini_tft.tools.run_current_patch_planner_gates \
+  --catalog data/metatft/current_rich_catalog_2026-05-31.json \
+  --checkpoint checkpoints/fight_value/current_patch_board_value_2026-05-31.pt \
+  --device cpu \
+  --suite minimum
+```
+
+Use `--suite strict` when changing target completion pressure, action pacing, or
+search behavior.
+
+## What Is Not Proven Yet
+
+- The toy PPO checkpoint is not a real TFT player-rank benchmark.
+- The current-patch value model is moderate, not a complete reward oracle.
+- MetaTFT aggregates are not full action traces.
+- There is not yet a complete current-patch `reset/step` environment.
+- Fight-value experiments are not yet a validated current-patch combat oracle.
 
 ## Development Rules
 
