@@ -16,6 +16,9 @@ def test_env_reset_and_end_turn_step() -> None:
     assert info["action_mask"].dtype == np.bool_
     assert info["action_mask"].shape == (NUM_ACTIONS,)
     assert info["action_mask"][Action.END_TURN]
+    assert info["stage_label"] == "Stage 1-1"
+    assert info["round_type"] == "pve"
+    assert info["is_pve_round"] is True
 
     next_obs, reward, terminated, truncated, next_info = env.step(Action.END_TURN)
 
@@ -24,6 +27,8 @@ def test_env_reset_and_end_turn_step() -> None:
     assert not terminated
     assert not truncated
     assert next_info["legal_action"] is True
+    assert next_info["stage_label"] == "Stage 1-2"
+    assert next_info["round_type"] == "pve"
 
 
 def test_same_seed_and_actions_are_deterministic() -> None:
@@ -119,10 +124,25 @@ def test_buy_xp_requires_owned_unit() -> None:
 
 
 def test_empty_board_end_turn_after_opening_is_penalized() -> None:
-    env = MiniTFTEnv(EnvConfig(seed=14))
-    env.reset(seed=14)
+    env = MiniTFTEnv(EnvConfig(seed=0))
+    env.reset(seed=0)
 
     _, opening_reward, _, _, _ = env.step(Action.END_TURN)
     _, empty_board_reward, _, _, _ = env.step(Action.END_TURN)
 
     assert empty_board_reward < opening_reward - 0.5
+
+
+def test_pve_rounds_drop_items_on_schedule() -> None:
+    env = MiniTFTEnv(EnvConfig(seed=15))
+    env.reset(seed=15)
+    assert env.state is not None
+
+    env.step(Action.END_TURN)
+    assert len(env.state.item_bench) == 1
+
+    env.state.item_bench.clear()
+    env.state.round = 4
+    env.step(Action.END_TURN)
+    assert env.state.round == 5
+    assert env.state.item_bench == []

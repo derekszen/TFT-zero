@@ -26,6 +26,7 @@ from mini_tft.bots import (
 from mini_tft.bots.base import BaseBot
 from mini_tft.core.actions import action_name
 from mini_tft.core.config import EnvConfig
+from mini_tft.core.rounds import is_item_drop_round, round_info
 from mini_tft.rl.dataset import load_dataset
 from mini_tft.rl.evaluate_policy import evaluate_bot
 from mini_tft.rl.gym_env import MiniTFTGymEnv
@@ -66,6 +67,7 @@ def run_smoke(config: SmokeConfig) -> dict[str, Any]:
         "dataset": {},
         "parallel_dataset": {},
         "evaluation": {},
+        "round_schedule": _round_schedule_preview(),
         "trace": [],
         "failures": [],
     }
@@ -151,6 +153,10 @@ def format_markdown(report: dict[str, Any]) -> str:
                 f"{len(evaluation)} bot baselines |"
             ),
             (
+                f"| Round Schedule | `{_status(bool(report['round_schedule']))}` | "
+                f"{len(report['round_schedule'])} preview rounds |"
+            ),
+            (
                 f"| Trace | `{_status(bool(report['trace']))}` | "
                 f"{len(report['trace'])} rendered steps |"
             ),
@@ -192,6 +198,21 @@ def format_markdown(report: dict[str, Any]) -> str:
             f"| Parallel dataset transitions/sec | {parallel_dataset['transitions_per_sec']:.1f} |",
             f"| Parallel dataset file MB | {parallel_dataset['file_mb']:.3f} |",
             "",
+            "## Round Schedule Preview",
+            "",
+            "| Round | Stage | Type | Item Drop |",
+            "| ---: | --- | --- | --- |",
+        ]
+    )
+    for row in report["round_schedule"]:
+        lines.append(
+            f"| {row['round']} | {row['stage_label']} | `{row['round_type']}` | "
+            f"`{row['item_drop_round']}` |"
+        )
+
+    lines.extend(
+        [
+            "",
             "## Dataset Shape",
             "",
             "| Array | Shape |",
@@ -222,13 +243,15 @@ def format_markdown(report: dict[str, Any]) -> str:
             "",
             "## Trace Preview",
             "",
-            "| Step | Action | Reward | Round | HP | Gold | Level | Board Strength | Done |",
-            "| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+            "| Step | Action | Reward | Stage | Type | Round | HP | Gold | Level | "
+            "Board Strength | Done |",
+            "| ---: | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |",
         ]
     )
     for row in report["trace"]:
         lines.append(
             f"| {row['step']} | `{row['action_name']}` | {row['reward']:.3f} | "
+            f"{row['stage_label']} | `{row['round_type']}` | "
             f"{row['round']} | {row['hp']} | {row['gold']} | {row['level']} | "
             f"{row['board_strength']:.1f} | `{row['done']}` |"
         )
@@ -346,6 +369,23 @@ def _run_evaluation(episodes: int) -> dict[str, dict[str, float]]:
     return {bot.name: evaluate_bot(bot, seeds) for bot in bots}
 
 
+def _round_schedule_preview(rounds: int = 14) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for round_num in range(1, rounds + 1):
+        current_round = round_info(round_num)
+        rows.append(
+            {
+                "round": round_num,
+                "stage": current_round.stage,
+                "stage_round": current_round.stage_round,
+                "stage_label": current_round.stage_label,
+                "round_type": current_round.round_type,
+                "item_drop_round": is_item_drop_round(round_num),
+            }
+        )
+    return rows
+
+
 def _run_trace(seed: int, max_steps: int) -> list[dict[str, Any]]:
     env = MiniTFTGymEnv(config=EnvConfig(seed=seed))
     bot = GreedyBoardBot()
@@ -365,6 +405,11 @@ def _run_trace(seed: int, max_steps: int) -> list[dict[str, Any]]:
                 "action_name": action_name(int(action)),
                 "reward": float(reward),
                 "round": int(info["round"]),
+                "stage": int(info["stage"]),
+                "stage_round": int(info["stage_round"]),
+                "stage_label": str(info["stage_label"]),
+                "round_type": str(info["round_type"]),
+                "is_pve_round": bool(info["is_pve_round"]),
                 "hp": int(info["hp"]),
                 "gold": int(info["gold"]),
                 "level": int(info["level"]),

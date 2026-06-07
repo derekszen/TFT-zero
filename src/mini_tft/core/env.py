@@ -28,6 +28,7 @@ from mini_tft.core.ids import EMPTY
 from mini_tft.core.items import maybe_drop_item, slam_best_item
 from mini_tft.core.masks import legal_action_mask
 from mini_tft.core.rewards import action_reward, end_turn_reward, illegal_action_reward
+from mini_tft.core.rounds import round_info
 from mini_tft.core.set_data import GameData, load_set
 from mini_tft.core.shop import sample_shop
 from mini_tft.core.state import GameState, UnitInstance, new_game_state
@@ -273,9 +274,15 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
         auto_end_turn: bool = False,
     ) -> dict[str, Any]:
         state = self._require_state()
+        current_round = round_info(state.round)
         info: dict[str, Any] = {
             "action_mask": self.action_masks(),
             "round": state.round,
+            "stage": current_round.stage,
+            "stage_round": current_round.stage_round,
+            "stage_label": current_round.stage_label,
+            "round_type": current_round.round_type,
+            "is_pve_round": current_round.is_pve,
             "round_action_count": state.round_action_count,
             "hp": state.hp,
             "gold": state.gold,
