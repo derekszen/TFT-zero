@@ -25,6 +25,7 @@ from mini_tft.core.state import UnitInstance, new_game_state, state_signature
 from mini_tft.rl.gym_env import MiniTFTGymEnv
 from mini_tft.tools.combat_fixture_report import run_combat_fixture_report
 from mini_tft.tools.sim_smoke import SmokeConfig, run_smoke
+from mini_tft.tools.web_ui_regression_gate import WebUiGateConfig, run_web_ui_regression_gate
 
 
 @dataclass(frozen=True)
@@ -86,6 +87,7 @@ def run_simulator_regression_gate(config: RegressionGateConfig) -> dict[str, Any
             _candidate_board_check(),
             _combat_fixture_check(),
             _level_pacing_check(config),
+            _web_ui_check(config.seed),
         ]
     )
 
@@ -131,6 +133,8 @@ def format_markdown(report: dict[str, Any]) -> str:
             "- `candidate_boards` checks stronger legal board generation without state mutation.",
             "- `item_flow` checks scheduled PvE component drops and combine/slam behavior.",
             "- `level_pacing` checks FastLevelBot still reaches level 8 on fixed seeds.",
+            "- `web_ui` checks browser payload defaults, enemy preview scaling, item "
+            "actions, and moves.",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -280,6 +284,18 @@ def _level_pacing_check(config: RegressionGateConfig) -> dict[str, Any]:
             "mean_survived_round": round(float(np.mean(rounds)), 3) if rounds else 0.0,
             "survival_rate": round(survival_rate, 3),
             "min_mean_final_level": config.min_mean_final_level,
+        },
+    )
+
+
+def _web_ui_check(seed: int) -> dict[str, Any]:
+    report = run_web_ui_regression_gate(WebUiGateConfig(seed=seed))
+    return _check(
+        "web_ui",
+        report["status"] == "pass",
+        {
+            "checks": len(report["checks"]),
+            "failures": report["failures"],
         },
     )
 

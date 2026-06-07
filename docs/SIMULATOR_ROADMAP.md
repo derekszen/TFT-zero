@@ -19,13 +19,27 @@ items, board strength, opponent pressure, and final-board commitments.
 
 | # | Gap | Current state | Useful next version | Difficulty | Branch-sized? |
 | ---: | --- | --- | --- | --- | --- |
-| 1 | Real round/stage/PvE structure | `MiniTFTEnv` has a simple round counter; the web UI derives a stage label from it. | Add canonical Set-1-like stage/round metadata, PvE rounds, round-specific gold/item drops, and stage-aware smoke metrics. | Easy to Medium | Yes |
+| 1 | Real round/stage/PvE structure | Implemented: canonical Set-1-like stage labels, PvE rounds, stage-aware web payloads, and PvE component drops. | Remaining: tune exact PvE rewards/drops if the learning loop needs closer Set-1 fidelity. | Easy | Done for V0 |
 | 2 | 8-player lobby pressure | Main env is single-player against an enemy curve. | TODO: add a lobby shell with 8 player states, bot-controlled opponents, HP standings, pairings, and later a shared pool. | Medium to Hard | Later |
 | 3 | Better combat value model | Abstract scalar combat already includes roles, stars, items, traits, position multipliers, and assassin pressure. | Add stronger combat fixtures and calibration gates; tune symbolic combat from fixture outcomes before using it for RL claims. | Easy to Medium | Yes |
-| 4 | Real board placement / candidate boards | Move actions already exist; `FIELD_BEST_BOARD` still hides too much for policy learning. | Add a candidate-board generator/top-k board action path, and keep manual placement/debug UI working. | Easy to Medium | Yes |
-| 5 | Realistic item flow | Completed items drop periodically; `SLAM_BEST_ITEM` attaches the first item to the best target. | Add Set-1-like components, PvE item drops, simple item combining, and explicit slam choices. | Medium | Yes |
+| 4 | Real board placement / candidate boards | Implemented: slot-level move actions, manual browser moves, and top-k candidate-board generation. `FIELD_BEST_BOARD` still exists as a debug convenience. | Remaining: expose candidate-board choices as explicit policy actions or wrappers for training. | Easy to Medium | Yes |
+| 5 | Realistic item flow | Implemented: Set-1-like components, PvE component drops, deterministic component combine, best-target slam, and browser labels for combine/slam. | Remaining: explicit item-choice actions such as choose recipe, choose item, and choose target unit. | Medium | Yes |
 | 6 | Opponent policy distribution | Heuristic bots exist, but the main env does not use them as live lobby opponents. | TODO: connect bot archetypes into lobby pressure and enemy-board sampling. | Medium | Yes, after #2 shell |
-| 7 | Calibration/regression gates | `sim_smoke.py`, combat fixtures, stage/PvE, components, and candidate-board helpers exist. | Add a recurring simulator gate for throughput, determinism, round timing, item timing, combat fixtures, level pacing, and candidate-board quality. | Easy | Yes |
+| 7 | Calibration/regression gates | Implemented: simulator gate covers throughput, determinism, round timing, item flow, combat fixtures, level pacing, candidate boards, and web UI payload behavior. | Remaining: add historical threshold tracking if CI starts collecting long-run metrics. | Easy | Done for V0 |
+
+## Current Recurring Gates
+
+Run these before simulator, planner, reward, or browser-playability changes:
+
+```bash
+uv run pytest -q tests/test_web_ui.py tests/test_web_ui_regression_gate.py
+uv run python -m mini_tft.tools.web_ui_regression_gate --strict
+uv run python -m mini_tft.tools.simulator_regression_gate --strict
+```
+
+Use the web UI gate when changing browser payloads, enemy previews, item
+affordances, or manual move behavior. Use the simulator gate when changing core
+state transitions, combat, items, candidate boards, pacing, or throughput.
 
 ## Quick Worktree Tasks
 

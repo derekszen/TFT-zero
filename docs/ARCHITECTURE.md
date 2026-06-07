@@ -95,6 +95,8 @@ under controlled traces.
 The main recurring gates are:
 
 - `sim_smoke.py` for toy simulator speed, determinism, and trace sanity
+- `web_ui_regression_gate` for browser payload defaults, enemy preview scaling,
+  item action affordances, and manual move behavior
 - fixed-seed heuristic/PPO evaluation for toy RL
 - heldout MetaTFT ranking metrics for current-patch value quality
 - `run_current_patch_planner_gates --suite minimum` before planner/RL
@@ -131,6 +133,9 @@ The strongest claims currently supported by code and reports are:
 
 - The toy Set-1-like simulator runs as a real `reset/step` environment with
   action masks, bots, dataset generation, text/UI inspection, and smoke tests.
+- The browser UI has a fast regression gate for opening state, stage-scaled
+  enemy previews, component combine/slam affordances, and manual bench/board
+  moves.
 - The toy PPO pipeline has a real trained checkpoint. The best documented
   5M-step PPO-from-BC checkpoint beats FastLevelBot on mean final HP and final
   scalar board strength in the toy simulator, while survival rate is effectively
@@ -164,6 +169,8 @@ The strongest claims currently supported by code and reports are:
   termination still need to be owned end to end before current-patch RL is real.
 - The fight-value teacher/model path is experimental and not yet connected as a
   validated current-patch combat oracle.
+- The web enemy display is still a preview derived from stage metadata. It is
+  not yet a literal opponent board generated from a live enemy policy.
 
 ## Practical Interpretation
 

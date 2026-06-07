@@ -30,6 +30,7 @@ def test_simulator_regression_gate_passes_minimum_quality_checks() -> None:
         "candidate_boards",
         "combat_fixtures",
         "level_pacing",
+        "web_ui",
     } <= names
     assert not report["failures"]
 
@@ -58,3 +59,4 @@ def test_simulator_regression_gate_markdown_is_agent_readable() -> None:
     assert "| Check | Status | Key Metrics |" in markdown
     assert "`combat_fixtures`" in markdown
     assert "`candidate_boards`" in markdown
+    assert "`web_ui`" in markdown
