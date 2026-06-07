@@ -142,6 +142,16 @@ def resolve_combat(
     enemy_index = min(round_num - 1, len(data.enemy_curve) - 1)
     enemy_strength = data.enemy_curve[enemy_index] + float(rng.normal(0.0, config.combat_noise_std))
     enemy_strength = max(0.0, enemy_strength - stats.enemy_power_penalty)
+    has_board_units = any(unit is not None for unit in board)
+    if not has_board_units and enemy_strength > 0.0:
+        damage = base_damage_by_round(round_num) + int(enemy_strength / 20)
+        return CombatResult(
+            won=False,
+            damage=damage,
+            my_strength=stats.strength,
+            enemy_strength=enemy_strength,
+            p_win=0.0,
+        )
     diff = stats.strength - enemy_strength
     p_win = 1.0 / (1.0 + exp(-(diff / config.combat_sigmoid_scale)))
     won = bool(rng.random() < p_win)

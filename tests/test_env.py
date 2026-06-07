@@ -19,6 +19,7 @@ def test_env_reset_and_end_turn_step() -> None:
     assert info["stage_label"] == "Stage 1-1"
     assert info["round_type"] == "pve"
     assert info["is_pve_round"] is True
+    assert info["gold"] == 2
 
     next_obs, reward, terminated, truncated, next_info = env.step(Action.END_TURN)
 
@@ -131,6 +132,17 @@ def test_empty_board_end_turn_after_opening_is_penalized() -> None:
     _, empty_board_reward, _, _, _ = env.step(Action.END_TURN)
 
     assert empty_board_reward < opening_reward - 0.5
+
+
+def test_empty_board_always_loses_opening_combat() -> None:
+    env = MiniTFTEnv(EnvConfig(seed=14))
+    env.reset(seed=14)
+    assert env.state is not None
+
+    env.step(Action.END_TURN)
+
+    assert env.state.last_win is False
+    assert env.state.hp < env.config.starting_hp
 
 
 def test_pve_rounds_drop_items_on_schedule() -> None:
