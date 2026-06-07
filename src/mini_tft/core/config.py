@@ -15,7 +15,7 @@ class EnvConfig:
     max_steps_per_episode: int = 1_000
     max_actions_per_round: int = 20
     starting_hp: int = 100
-    starting_gold: int = 2
+    starting_gold: int = 3
     starting_level: int = 3
     starting_xp: int = 0
     max_level: int = 9

@@ -22,7 +22,7 @@ def interest(gold: int, cap: int = 5) -> int:
 
 def income_after_combat(gold: int, won: bool, config: EnvConfig) -> int:
     win_gold = config.win_gold if won else 0
-    return config.base_income + interest(gold, config.max_interest) + win_gold
+    return config.base_income + win_gold + interest(gold + win_gold, config.max_interest)
 
 
 def xp_needed(level: int) -> int:

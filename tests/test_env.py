@@ -19,7 +19,7 @@ def test_env_reset_and_end_turn_step() -> None:
     assert info["stage_label"] == "Stage 1-1"
     assert info["round_type"] == "pve"
     assert info["is_pve_round"] is True
-    assert info["gold"] == 2
+    assert info["gold"] == 3
 
     next_obs, reward, terminated, truncated, next_info = env.step(Action.END_TURN)
 

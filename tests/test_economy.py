@@ -18,6 +18,13 @@ def test_income_uses_base_interest_and_win_gold() -> None:
     assert income_after_combat(30, won=True, config=config) == 9
 
 
+def test_win_gold_counts_before_interest_breakpoint() -> None:
+    config = EnvConfig()
+
+    assert income_after_combat(9, won=False, config=config) == 5
+    assert income_after_combat(9, won=True, config=config) == 7
+
+
 def test_apply_xp_levels_repeatedly() -> None:
     level, xp = apply_xp(level=3, xp=0, amount=20, max_level=9)
 
