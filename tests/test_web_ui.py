@@ -12,6 +12,8 @@ def test_web_session_payload_exposes_interactive_state() -> None:
 
     assert payload["status"]["round"] == 1
     assert payload["status"]["stage_label"] == "Stage 1-1"
+    assert payload["status"]["round_type"] == "pve"
+    assert payload["status"]["is_pve_round"] is True
     assert payload["enemy"]["label"] == "Stage 1-1 enemy"
     assert len(payload["enemy"]["slots"]) >= 2
     assert len(payload["shop"]) == 5

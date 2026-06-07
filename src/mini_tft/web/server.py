@@ -21,6 +21,7 @@ from mini_tft.core.config import EnvConfig
 from mini_tft.core.economy import xp_needed
 from mini_tft.core.env import MiniTFTEnv
 from mini_tft.core.ids import EMPTY
+from mini_tft.core.rounds import round_info
 from mini_tft.core.state import UnitInstance
 from mini_tft.core.traits import active_trait_effects, trait_counts
 
@@ -168,7 +169,7 @@ def serialize_state(
     state = env._require_state()
     stats = board_strength(state.board, env.data)
     enemy_index = min(state.round - 1, len(env.data.enemy_curve) - 1)
-    stage = _stage_info(state.round)
+    stage = round_info(state.round)
     enemy_next = round(env.data.enemy_curve[enemy_index], 2)
     mask = env.action_masks()
     active = active_trait_effects(state.board, env.data)
@@ -178,9 +179,11 @@ def serialize_state(
         "seed": seed,
         "status": {
             "round": state.round,
-            "stage": stage["stage"],
-            "stage_round": stage["stage_round"],
-            "stage_label": stage["label"],
+            "stage": stage.stage,
+            "stage_round": stage.stage_round,
+            "stage_label": stage.stage_label,
+            "round_type": stage.round_type,
+            "is_pve_round": stage.is_pve,
             "max_round": env.config.max_round,
             "hp": state.hp,
             "gold": state.gold,
@@ -197,7 +200,7 @@ def serialize_state(
             "enemy_next": enemy_next,
             "enemy_power_penalty": round(stats.enemy_power_penalty, 2),
         },
-        "enemy": _serialize_enemy(stage["label"], enemy_next),
+        "enemy": _serialize_enemy(stage.stage_label, enemy_next),
         "shop": [
             None if unit_id == EMPTY else _serialize_unit_def(env, unit_id, asset_manifest)
             for unit_id in state.shop
@@ -358,16 +361,6 @@ def _valid_slot(slots: list[UnitInstance | None], index: int) -> bool:
 
 def _slot_label(zone: str, index: int) -> str:
     return f"{zone.title()} {index + 1}"
-
-
-def _stage_info(round_num: int) -> dict[str, int | str]:
-    stage = ((round_num - 1) // 6) + 1
-    stage_round = ((round_num - 1) % 6) + 1
-    return {
-        "stage": stage,
-        "stage_round": stage_round,
-        "label": f"Stage {stage}-{stage_round}",
-    }
 
 
 def _serialize_enemy(stage_label: str, strength: float) -> dict[str, Any]:

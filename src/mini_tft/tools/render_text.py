@@ -6,6 +6,7 @@ from mini_tft.core.combat import board_strength
 from mini_tft.core.economy import xp_needed
 from mini_tft.core.env import MiniTFTEnv
 from mini_tft.core.ids import EMPTY
+from mini_tft.core.rounds import round_info
 from mini_tft.core.traits import active_trait_effects
 
 
@@ -13,7 +14,9 @@ def render_state(env: MiniTFTEnv) -> str:
     if env.state is None:
         return "MiniTFTEnv(uninitialized)"
     state = env.state
+    current_round = round_info(state.round)
     lines = [
+        f"{current_round.stage_label} ({current_round.round_type.upper()}) | "
         f"Round {state.round} | HP {state.hp} | Gold {state.gold} | "
         f"Level {state.level} | XP {state.xp}/{xp_needed(state.level)}",
         "",

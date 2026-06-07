@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from mini_tft.core.config import EnvConfig
+from mini_tft.core.rounds import is_item_drop_round
 from mini_tft.core.set_data import GameData
 from mini_tft.core.state import GameState, UnitInstance
 
@@ -45,7 +46,7 @@ def slam_best_item(state: GameState, data: GameData, config: EnvConfig) -> bool:
 
 
 def maybe_drop_item(state: GameState, data: GameData, config: EnvConfig, rng) -> None:
-    if state.round % config.item_drop_interval != 0:
+    if not is_item_drop_round(state.round):
         return
     if len(state.item_bench) >= config.item_bench_size:
         return
