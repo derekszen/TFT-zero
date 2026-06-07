@@ -236,8 +236,11 @@ button:disabled {
 
 .enemy-squad {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 14px;
+  align-content: center;
+  gap: 8px 12px;
+  width: min(610px, 62vw);
   min-height: 54px;
 }
 
@@ -245,7 +248,7 @@ button:disabled {
   display: grid;
   justify-items: center;
   gap: 3px;
-  width: 54px;
+  width: 50px;
   color: rgba(244, 234, 210, 0.74);
   font-size: 10px;
   font-weight: 800;
@@ -657,6 +660,7 @@ button:disabled {
 
 .items-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -681,6 +685,27 @@ button:disabled {
   color: var(--muted);
   font-size: 12px;
   font-weight: 750;
+}
+
+.item-chip.component {
+  border-color: rgba(89, 172, 212, 0.4);
+  color: #b8d9f3;
+}
+
+.item-chip.completed {
+  border-color: rgba(224, 177, 73, 0.56);
+  color: #ffe3a2;
+}
+
+.item-chip.actionable {
+  cursor: pointer;
+}
+
+.item-chip.actionable:hover,
+.item-chip.actionable:focus {
+  border-color: rgba(255, 215, 122, 0.9);
+  filter: brightness(1.16);
+  outline: none;
 }
 
 .log-list {

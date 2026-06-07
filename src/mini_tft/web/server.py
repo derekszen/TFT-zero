@@ -21,7 +21,8 @@ from mini_tft.core.config import EnvConfig
 from mini_tft.core.economy import xp_needed
 from mini_tft.core.env import MiniTFTEnv
 from mini_tft.core.ids import EMPTY
-from mini_tft.core.rounds import round_info
+from mini_tft.core.items import best_item_target, first_combinable_recipe, is_completed_item
+from mini_tft.core.rounds import RoundInfo, round_info
 from mini_tft.core.state import UnitInstance
 from mini_tft.core.traits import active_trait_effects, trait_counts
 
@@ -200,7 +201,7 @@ def serialize_state(
             "enemy_next": enemy_next,
             "enemy_power_penalty": round(stats.enemy_power_penalty, 2),
         },
-        "enemy": _serialize_enemy(stage.stage_label, enemy_next),
+        "enemy": _serialize_enemy(stage, enemy_next),
         "shop": [
             None if unit_id == EMPTY else _serialize_unit_def(env, unit_id, asset_manifest)
             for unit_id in state.shop
@@ -214,6 +215,7 @@ def serialize_state(
             for index, unit in enumerate(state.board)
         ],
         "items": [_serialize_item(env, item_id) for item_id in state.item_bench],
+        "item_action": _serialize_item_action(env, mask),
         "traits": _serialize_traits(env, counts, active),
         "actions": [
             {
@@ -280,6 +282,81 @@ def _serialize_item(env: MiniTFTEnv, item_id: int) -> dict[str, Any]:
         "components": list(item.components),
         "tags": list(item.tags),
         "effects": item.effects,
+    }
+
+
+def _serialize_item_action(env: MiniTFTEnv, mask: np.ndarray) -> dict[str, Any]:
+    state = env._require_state()
+    legal = bool(mask[Action.SLAM_BEST_ITEM])
+
+    if not state.item_bench:
+        return {
+            "mode": "none",
+            "label": "No Items",
+            "detail": "",
+            "legal": False,
+        }
+
+    completed = [
+        (index, item_id)
+        for index, item_id in enumerate(state.item_bench)
+        if is_completed_item(item_id, env.data)
+    ]
+    recipe = first_combinable_recipe(state.item_bench, env.data)
+
+    if completed:
+        _, item_id = completed[0]
+        item = env.data.items[item_id]
+        target = best_item_target(state.board, item_id, env.data, env.config)
+        if target is not None and state.board[target] is not None:
+            unit = env.data.units[state.board[target].unit_id]
+            return {
+                "mode": "slam",
+                "label": f"Slam {item.name}",
+                "detail": f"{item.name} -> {unit.name}",
+                "legal": legal,
+                "item_id": item_id,
+                "target_slot": target,
+                "target_name": unit.name,
+            }
+        if recipe is not None:
+            return _serialize_recipe_action(env, recipe, legal)
+        return {
+            "mode": "blocked",
+            "label": "Field Unit",
+            "detail": f"Field a unit to slam {item.name}",
+            "legal": False,
+            "item_id": item_id,
+        }
+
+    if recipe is not None:
+        return _serialize_recipe_action(env, recipe, legal)
+
+    return {
+        "mode": "blocked",
+        "label": "Need Pair",
+        "detail": "Need two compatible components",
+        "legal": False,
+    }
+
+
+def _serialize_recipe_action(
+    env: MiniTFTEnv,
+    recipe: tuple[int, int, int],
+    legal: bool,
+) -> dict[str, Any]:
+    first_index, second_index, completed_id = recipe
+    state = env._require_state()
+    first_item = env.data.items[state.item_bench[first_index]]
+    second_item = env.data.items[state.item_bench[second_index]]
+    completed_item = env.data.items[completed_id]
+    return {
+        "mode": "combine",
+        "label": f"Combine {completed_item.name}",
+        "detail": f"{first_item.name} + {second_item.name} -> {completed_item.name}",
+        "legal": legal,
+        "item_id": completed_id,
+        "component_indexes": [first_index, second_index],
     }
 
 
@@ -365,20 +442,59 @@ def _slot_label(zone: str, index: int) -> str:
     return f"{zone.title()} {index + 1}"
 
 
-def _serialize_enemy(stage_label: str, strength: float) -> dict[str, Any]:
-    slot_count = min(6, max(2, int(strength // 45) + 2))
-    tier = min(5, max(1, int(strength // 70) + 1))
+def _serialize_enemy(stage: RoundInfo, strength: float) -> dict[str, Any]:
+    slot_count = _enemy_slot_count(stage)
+    tier = min(5, max(1, stage.stage - 1 if not stage.is_pve else stage.stage))
     return {
-        "label": f"{stage_label} enemy",
+        "label": f"{stage.stage_label} enemy",
         "strength": strength,
+        "unit_count": slot_count,
+        "display_level": slot_count if not stage.is_pve else None,
         "slots": [
             {
-                "name": f"Enemy {index + 1}",
+                "name": _enemy_slot_name(stage, index),
                 "tier": tier,
             }
             for index in range(slot_count)
         ],
     }
+
+
+def _enemy_slot_count(stage: RoundInfo) -> int:
+    if stage.is_pve:
+        return {
+            1: 3,
+            2: 3,
+            3: 4,
+            4: 5,
+            5: 6,
+            6: 1,
+        }.get(stage.stage, 6)
+    if stage.stage == 2:
+        return 3 if stage.stage_round <= 2 else 4
+    if stage.stage == 3:
+        return 5 if stage.stage_round <= 3 else 6
+    if stage.stage == 4:
+        return 7
+    if stage.stage == 5:
+        return 8 if stage.stage_round <= 4 else 9
+    return 9
+
+
+def _enemy_slot_name(stage: RoundInfo, index: int) -> str:
+    if not stage.is_pve:
+        return f"Enemy {index + 1}"
+    if stage.stage == 1:
+        return f"Minion {index + 1}"
+    if stage.stage == 2:
+        return f"Krug {index + 1}"
+    if stage.stage == 3:
+        return f"Wolf {index + 1}"
+    if stage.stage == 4:
+        return f"Raptor {index + 1}"
+    if stage.stage == 6 and index == 0:
+        return "Dragon"
+    return f"Monster {index + 1}"
 
 
 def _load_asset_manifest() -> dict[str, Any]:

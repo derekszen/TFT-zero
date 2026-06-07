@@ -17,7 +17,8 @@ def test_web_session_payload_exposes_interactive_state() -> None:
     assert payload["status"]["hp"] == 100
     assert payload["status"]["gold"] == 3
     assert payload["enemy"]["label"] == "Stage 1-1 enemy"
-    assert len(payload["enemy"]["slots"]) >= 2
+    assert payload["enemy"]["unit_count"] == 3
+    assert len(payload["enemy"]["slots"]) == 3
     assert len(payload["shop"]) == 5
     assert len(payload["board"]) == 9
     assert len(payload["bench"]) == 9
@@ -37,6 +38,58 @@ def test_web_session_can_step_and_reset() -> None:
     assert after_reset["seed"] == 13
     assert after_reset["status"]["round"] == 1
     assert after_reset["log"][0] == "Reset seed 13"
+
+
+def test_web_session_enemy_preview_scales_with_stage_board_size() -> None:
+    session = MiniTFTWebSession(seed=17)
+    assert session.env.state is not None
+
+    session.env.state.round = 4
+    stage_2_payload = session.payload()
+    assert stage_2_payload["status"]["stage_label"] == "Stage 2-1"
+    assert stage_2_payload["enemy"]["display_level"] == 3
+    assert stage_2_payload["enemy"]["unit_count"] == 3
+    assert len(stage_2_payload["enemy"]["slots"]) == 3
+
+    session.env.state.round = 18
+    stage_4_payload = session.payload()
+    assert stage_4_payload["status"]["stage_label"] == "Stage 4-1"
+    assert stage_4_payload["enemy"]["display_level"] == 7
+    assert stage_4_payload["enemy"]["unit_count"] == 7
+    assert len(stage_4_payload["enemy"]["slots"]) == 7
+
+    session.env.state.round = 24
+    pve_payload = session.payload()
+    assert pve_payload["status"]["stage_label"] == "Stage 4-7"
+    assert pve_payload["status"]["round_type"] == "pve"
+    assert pve_payload["enemy"]["display_level"] is None
+    assert pve_payload["enemy"]["unit_count"] == 5
+    assert pve_payload["enemy"]["slots"][0]["name"] == "Raptor 1"
+
+
+def test_web_session_item_action_exposes_combine_then_slam_flow() -> None:
+    session = MiniTFTWebSession(seed=18)
+    assert session.env.state is not None
+    session.env.state.board[0] = UnitInstance(unit_id=2)
+    session.env.state.item_bench = [101, 102]
+
+    component_payload = session.payload()
+    assert component_payload["item_action"]["mode"] == "combine"
+    assert component_payload["item_action"]["label"] == "Combine Rageblade"
+    assert component_payload["item_action"]["legal"] is True
+
+    completed_payload = session.step(Action.SLAM_BEST_ITEM)
+    assert completed_payload["last"]["legal"] is True
+    assert completed_payload["items"][0]["name"] == "Rageblade"
+    assert completed_payload["item_action"]["mode"] == "slam"
+    assert completed_payload["item_action"]["label"] == "Slam Rageblade"
+    assert completed_payload["item_action"]["target_name"] == "Vayne"
+
+    slammed_payload = session.step(Action.SLAM_BEST_ITEM)
+    assert slammed_payload["last"]["legal"] is True
+    assert slammed_payload["items"] == []
+    assert slammed_payload["board"][0]["items"][0]["name"] == "Rageblade"
+    assert slammed_payload["item_action"]["mode"] == "none"
 
 
 def test_web_session_can_manually_move_unit_from_bench_to_board() -> None:

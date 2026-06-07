@@ -107,7 +107,8 @@ function renderEnemy() {
   const root = document.getElementById("enemySquad");
   const gate = document.getElementById("enemyGate");
   root.innerHTML = "";
-  gate.textContent = `${state.enemy.label} · ${state.enemy.strength}`;
+  const level = state.enemy.display_level ? ` · Lv. ${state.enemy.display_level}` : "";
+  gate.textContent = `${state.enemy.label} · ${state.enemy.unit_count} units${level} · ${state.enemy.strength}`;
   for (const slot of state.enemy.slots) {
     const token = document.createElement("div");
     token.className = `enemy-token tier-${slot.tier}`;
@@ -230,9 +231,11 @@ function renderShop() {
 function renderItems() {
   const root = document.getElementById("items");
   root.innerHTML = "";
+  const itemAction = state.item_action || {};
   const label = document.createElement("span");
   label.className = "items-label";
   label.textContent = "Items";
+  label.title = itemAction.detail || "";
   root.append(label);
   if (!state.items.length) {
     root.append(emptyState("None"));
@@ -240,10 +243,34 @@ function renderItems() {
   }
   for (const item of state.items) {
     const chip = document.createElement("span");
-    chip.className = "item-chip";
+    chip.className = `item-chip ${item.kind}`;
     chip.textContent = item.name;
+    chip.title = itemChipTitle(item);
+    if (itemAction.legal) {
+      chip.classList.add("actionable");
+      chip.setAttribute("role", "button");
+      chip.tabIndex = 0;
+      chip.addEventListener("click", () => postAction(ACTION.SLAM_BEST_ITEM));
+      chip.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          postAction(ACTION.SLAM_BEST_ITEM);
+        }
+      });
+    }
     root.append(chip);
   }
+}
+
+function itemChipTitle(item) {
+  const tags = item.tags?.length ? ` · ${item.tags.join("/")}` : "";
+  const effects = Object.entries(item.effects || {})
+    .map(([key, value]) => `${key.replaceAll("_", " ")} ${value}`)
+    .join(", ");
+  if (item.kind === "component") {
+    return `Component${tags}`;
+  }
+  return effects ? `Completed${tags} · ${effects}` : `Completed${tags}`;
 }
 
 function renderLog() {
@@ -282,14 +309,23 @@ function bindActionButtons() {
   setButton("buyXp", ACTION.BUY_XP);
   setButton("roll", ACTION.ROLL);
   setButton("fieldBest", ACTION.FIELD_BEST_BOARD);
-  setButton("slamItem", ACTION.SLAM_BEST_ITEM);
+  setButton(
+    "slamItem",
+    ACTION.SLAM_BEST_ITEM,
+    state.item_action?.label || "Slam Item",
+    state.item_action?.detail || "",
+  );
   setButton("endTurn", ACTION.END_TURN);
   document.getElementById("botStep").disabled = state.status.done;
   renderPlayControls();
 }
 
-function setButton(id, action) {
+function setButton(id, action, label = null, title = "") {
   const button = document.getElementById(id);
+  if (label !== null) {
+    button.textContent = label;
+  }
+  button.title = title;
   button.disabled = !actionLegal(action);
   button.onclick = () => postAction(action);
 }
