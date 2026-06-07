@@ -33,6 +33,7 @@ uv run python -m mini_tft.tools.generate_bot_dataset --suite fastlevel --episode
 uv run python -m mini_tft.rl.pretrain_bc --dataset rollouts/fastlevel_bc_5k.npz --epochs 80 --hidden-sizes 256,256 --out checkpoints/bc_fastlevel_5k_e80_h256
 uv run python -m mini_tft.rl.train_ppo --init checkpoints/bc_fastlevel_5k_e80_h256.zip --timesteps 250000 --num-envs 8 --device cpu --out checkpoints/ppo_from_bc_fastlevel_250k_h256
 uv run python -m mini_tft.rl.evaluate_policy --episodes 100 --checkpoint checkpoints/ppo_from_bc_fastlevel_250k_h256.zip
+uv run python -m mini_tft.tools.simulator_regression_gate --strict
 uv run python -m mini_tft.tools.scrape_assets
 ```
 

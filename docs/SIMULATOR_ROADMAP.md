@@ -20,12 +20,12 @@ items, board strength, opponent pressure, and final-board commitments.
 | # | Gap | Current state | Useful next version | Difficulty | Branch-sized? |
 | ---: | --- | --- | --- | --- | --- |
 | 1 | Real round/stage/PvE structure | `MiniTFTEnv` has a simple round counter; the web UI derives a stage label from it. | Add canonical Set-1-like stage/round metadata, PvE rounds, round-specific gold/item drops, and stage-aware smoke metrics. | Easy to Medium | Yes |
-| 2 | 8-player lobby pressure | Main env is single-player against an enemy curve. | Add a lobby shell with 8 player states, bot-controlled opponents, HP standings, pairings, and later a shared pool. | Medium to Hard | Yes, if split |
+| 2 | 8-player lobby pressure | Main env is single-player against an enemy curve. | TODO: add a lobby shell with 8 player states, bot-controlled opponents, HP standings, pairings, and later a shared pool. | Medium to Hard | Later |
 | 3 | Better combat value model | Abstract scalar combat already includes roles, stars, items, traits, position multipliers, and assassin pressure. | Add stronger combat fixtures and calibration gates; tune symbolic combat from fixture outcomes before using it for RL claims. | Easy to Medium | Yes |
 | 4 | Real board placement / candidate boards | Move actions already exist; `FIELD_BEST_BOARD` still hides too much for policy learning. | Add a candidate-board generator/top-k board action path, and keep manual placement/debug UI working. | Easy to Medium | Yes |
 | 5 | Realistic item flow | Completed items drop periodically; `SLAM_BEST_ITEM` attaches the first item to the best target. | Add Set-1-like components, PvE item drops, simple item combining, and explicit slam choices. | Medium | Yes |
 | 6 | Opponent policy distribution | Heuristic bots exist, but the main env does not use them as live lobby opponents. | TODO: connect bot archetypes into lobby pressure and enemy-board sampling. | Medium | Yes, after #2 shell |
-| 7 | Calibration/regression gates | `sim_smoke.py`, PPO evals, and planner gates exist; simulator realism gates are still thin. | TODO: add recurring gates for round timing, level timing, final-board archetype match, combat fixtures, item timing, and throughput. | Easy | Yes |
+| 7 | Calibration/regression gates | `sim_smoke.py`, combat fixtures, stage/PvE, components, and candidate-board helpers exist. | Add a recurring simulator gate for throughput, determinism, round timing, item timing, combat fixtures, level pacing, and candidate-board quality. | Easy | Yes |
 
 ## Quick Worktree Tasks
 
@@ -122,26 +122,26 @@ uv run pytest -q tests/test_items.py tests/test_env.py
 uv run python sim_smoke.py
 ```
 
-### 5. Lobby Shell V0
+### 5. Simulator Regression Gate
 
 Suggested branch:
 
 ```text
-sim/set1-lobby-shell-v0
+sim/simulator-regression-gates
 ```
 
 Scope:
 
-- Add `Set1LobbyState` with 8 player states.
-- Step one planning/combat round for all players using supplied policies.
-- Track player HP, alive status, pairings, and standings.
-- Start without shared pool if needed; add shared pool in a separate branch.
+- Add one recurring simulator realism gate command.
+- Report throughput, determinism, round timing, item timing, combat fixture pass
+  rate, level pacing, and candidate-board quality.
+- Emit compact Markdown by default and JSON for pipelines.
 
 Acceptance:
 
 ```bash
-uv run pytest -q tests/test_lobby*.py
-uv run python -m mini_tft.tools.benchmark_env
+uv run pytest -q tests/test_simulator_regression_gate.py
+uv run python -m mini_tft.tools.simulator_regression_gate --strict
 ```
 
 ## Harder Work
@@ -200,9 +200,10 @@ Preferred approach:
 2. Combat fixture gate.
 3. Item components V0.
 4. Candidate-board actions.
-5. Lobby shell V0.
-6. Opponent policy distribution.
-7. Shared unit pool.
+5. Simulator regression gate.
+6. Lobby shell V0.
+7. Opponent policy distribution.
+8. Shared unit pool.
 
 This order keeps each branch testable and avoids turning the simulator into a
 slow exact-combat project before the RL loop needs it.
