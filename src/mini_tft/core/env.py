@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import gymnasium as gym
 import numpy as np
@@ -32,10 +32,9 @@ from mini_tft.core.set_data import GameData, load_set
 from mini_tft.core.shop import sample_shop
 from mini_tft.core.state import GameState, UnitInstance, new_game_state
 from mini_tft.core.upgrades import auto_combine
-from mini_tft.fight_model.simulator_adapter import (
-    FightValueCombatModel,
-    resolve_combat_with_fight_value,
-)
+
+if TYPE_CHECKING:
+    from mini_tft.fight_model.simulator_adapter import FightValueCombatModel
 
 
 class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
@@ -300,6 +299,8 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
         if self.config.combat_model == "fight_value":
             if self.fight_value_model is None:
                 raise RuntimeError("fight_value combat selected without a loaded evaluator")
+            from mini_tft.fight_model.simulator_adapter import resolve_combat_with_fight_value
+
             return resolve_combat_with_fight_value(
                 state.board,
                 state.round,
@@ -327,6 +328,8 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
             raise ValueError(f"unsupported combat_model: {self.config.combat_model}")
         if not self.config.fight_value_checkpoint:
             raise ValueError("fight_value combat_model requires fight_value_checkpoint")
+        from mini_tft.fight_model.simulator_adapter import FightValueCombatModel
+
         evaluator = FightValueCombatModel(
             self.config.fight_value_checkpoint,
             device_name=self.config.fight_value_device,
