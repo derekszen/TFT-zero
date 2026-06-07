@@ -33,6 +33,8 @@ class ItemDef:
     name: str
     tags: tuple[str, ...]
     effects: dict[str, float]
+    kind: str = "completed"
+    components: tuple[int, int] = ()
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,9 @@ class GameData:
     trait_ids: tuple[str, ...]
     max_unit_id: int
     max_item_id: int
+    component_item_ids: tuple[int, ...]
+    completed_item_ids: tuple[int, ...]
+    item_recipes: dict[tuple[int, int], int]
 
 
 def load_set(name: str = "set1") -> GameData:
@@ -87,8 +92,21 @@ def load_set(name: str = "set1") -> GameData:
             name=str(item["name"]),
             tags=tuple(str(tag) for tag in item["tags"]),
             effects={str(effect): float(value) for effect, value in item["effects"].items()},
+            kind=str(item.get("kind", "completed")),
+            components=tuple(sorted(int(component) for component in item.get("components", ()))),
         )
         for item in items_raw
+    }
+    component_item_ids = tuple(
+        sorted(item.id for item in items.values() if item.kind == "component")
+    )
+    completed_item_ids = tuple(
+        sorted(item.id for item in items.values() if item.kind == "completed")
+    )
+    item_recipes = {
+        item.components: item.id
+        for item in items.values()
+        if item.kind == "completed" and item.components
     }
 
     shop_odds = {
@@ -111,6 +129,9 @@ def load_set(name: str = "set1") -> GameData:
         trait_ids=trait_ids,
         max_unit_id=max(units),
         max_item_id=max(items),
+        component_item_ids=component_item_ids,
+        completed_item_ids=completed_item_ids,
+        item_recipes=item_recipes,
     )
     validate_data(data)
     return data
@@ -138,6 +159,26 @@ def validate_data(data: GameData) -> None:
     for cost in range(1, 6):
         if cost not in data.units_by_cost:
             raise ValueError(f"no units for cost {cost}")
+
+    for item in data.items.values():
+        if item.kind not in {"component", "completed"}:
+            raise ValueError(f"{item.name} has invalid item kind {item.kind}")
+        if item.kind == "component" and item.components:
+            raise ValueError(f"{item.name} component item cannot have a recipe")
+        if item.components:
+            for component_id in item.components:
+                component = data.items.get(component_id)
+                if component is None:
+                    raise ValueError(f"{item.name} references missing component {component_id}")
+                if component.kind != "component":
+                    raise ValueError(f"{item.name} recipe uses non-component {component.name}")
+
+    for recipe, completed_id in data.item_recipes.items():
+        if len(recipe) != 2:
+            raise ValueError(f"item recipe for {completed_id} must have exactly two components")
+
+    if not data.completed_item_ids:
+        raise ValueError("set must define at least one completed item")
 
 
 def _load_json(filename: str) -> Any:

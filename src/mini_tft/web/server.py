@@ -276,6 +276,8 @@ def _serialize_item(env: MiniTFTEnv, item_id: int) -> dict[str, Any]:
     return {
         "id": item.id,
         "name": item.name,
+        "kind": item.kind,
+        "components": list(item.components),
         "tags": list(item.tags),
         "effects": item.effects,
     }

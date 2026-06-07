@@ -16,6 +16,7 @@ from mini_tft.core.actions import (
 from mini_tft.core.board import would_change_best_board
 from mini_tft.core.config import EnvConfig
 from mini_tft.core.ids import EMPTY
+from mini_tft.core.items import first_combinable_recipe, is_completed_item
 from mini_tft.core.set_data import GameData
 from mini_tft.core.state import GameState
 
@@ -53,12 +54,13 @@ def legal_action_mask(
     has_units = any(unit is not None for unit in [*state.bench, *state.board])
     mask[Action.FIELD_BEST_BOARD] = has_units and would_change_best_board(state, data, config)
 
-    has_item = bool(state.item_bench)
+    has_completed_item = any(is_completed_item(item_id, data) for item_id in state.item_bench)
+    has_combinable_components = first_combinable_recipe(state.item_bench, data) is not None
     has_target = any(
         unit is not None and len(unit.items) < config.max_items_on_unit
         for unit in state.board
     )
-    mask[Action.SLAM_BEST_ITEM] = has_item and has_target
+    mask[Action.SLAM_BEST_ITEM] = (has_completed_item and has_target) or has_combinable_components
 
     has_board_room = board_count < state.level
     for bench_index, unit in enumerate(state.bench):
