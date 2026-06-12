@@ -39,7 +39,7 @@ fight = [
 
 [dependency-groups]
 dev = [
-  "mypy>=1.11.0",
+  "pyright>=1.1.410",
   "pytest>=8.0.0",
   "ruff>=0.6.0",
 ]
@@ -58,3 +58,10 @@ extend-exclude = ["third_party"]
 
 [tool.ruff.lint]
 select = ["B", "E", "F", "I", "UP"]
+
+[tool.pyright]
+include = ["src"]
+exclude = ["third_party", "**/__pycache__"]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+reportMissingTypeStubs = false

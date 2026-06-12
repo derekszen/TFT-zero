@@ -9,7 +9,7 @@ import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import zarr
@@ -119,7 +119,7 @@ def validate_dataset(root: Path) -> dict[str, Any]:
         for name, dtype in FIGHT_ARRAY_DTYPES.items():
             if name not in group:
                 raise ValueError(f"{shard['name']} missing array {name}")
-            array = group[name]
+            array = cast(zarr.Array, group[name])
             if array.shape[0] != count:
                 raise ValueError(f"{shard['name']} array {name} has wrong leading length")
             if np.dtype(array.dtype) != dtype:

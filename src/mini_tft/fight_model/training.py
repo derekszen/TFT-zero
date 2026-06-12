@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -129,7 +129,7 @@ def evaluate_model(
 
 
 def _tensorize_arrays(
-    arrays: dict[str, object],
+    arrays: Mapping[str, object],
     device: torch.device,
 ) -> dict[str, torch.Tensor]:
     return {name: torch.as_tensor(array, device=device) for name, array in arrays.items()}

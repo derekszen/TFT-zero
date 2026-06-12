@@ -215,14 +215,14 @@ def build_shop_bench_board_transitions(
             )
         if include_swaps:
             for board_index, board_unit in enumerate(state.board):
-                board = list(state.board)
-                bench = list(state.bench)
-                board[board_index] = replace(bench_unit, position=board_unit.position)
-                bench[bench_index] = replace(board_unit, position=bench_unit.position)
+                board_slots = list(state.board)
+                bench_slots = list(state.bench)
+                board_slots[board_index] = replace(bench_unit, position=board_unit.position)
+                bench_slots[bench_index] = replace(board_unit, position=bench_unit.position)
                 after = _replace_state(
                     state,
-                    board=tuple(board),
-                    bench=tuple(bench),
+                    board=tuple(board_slots),
+                    bench=tuple(bench_slots),
                     action=f"swap_bench_{bench_index}_board_{board_index}",
                 )
                 transitions.append(

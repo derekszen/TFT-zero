@@ -113,7 +113,7 @@ def _enemy_preview_schedule_check(seed: int) -> dict[str, Any]:
         24: ("Stage 4-7", "pve", 5, None, "Raptor 1"),
         32: ("Stage 6-1", "pvp", 9, 9, "Enemy 1"),
     }
-    rows = []
+    rows: list[dict[str, Any]] = []
     ok = True
     for round_num, expected_row in expected.items():
         session.env.state.round = round_num

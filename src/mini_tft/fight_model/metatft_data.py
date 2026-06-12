@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -27,7 +28,7 @@ def fetch_current_comp_strength(
     days: int = 3,
     ranks: tuple[str, ...] = DEFAULT_RANKS,
     min_count: int = 10_000,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     """Fetch and normalize current-patch MetaTFT comp aggregate rankings."""
 
     stats_params = {
@@ -41,16 +42,33 @@ def fetch_current_comp_strength(
     cluster_url = f"{METATFT_COMPS_API}/latest_cluster_info"
     stats = _get_json(stats_url)
     cluster_info = _get_json(cluster_url)["cluster_info"]
+    if not isinstance(cluster_info, dict):
+        raise TypeError("MetaTFT cluster_info must be an object")
+    cluster_details = cluster_info["cluster_details"]
+    if not isinstance(cluster_details, dict):
+        raise TypeError("MetaTFT cluster_details must be an object")
+    cluster_rows = cluster_details["clusters"]
+    if not isinstance(cluster_rows, list):
+        raise TypeError("MetaTFT cluster list must be an array")
     clusters = {
         str(row["Cluster"]): row
-        for row in cluster_info["cluster_details"]["clusters"]
+        for row in cluster_rows
+        if isinstance(row, dict)
     }
-    records = []
-    for row in stats["results"]:
+    records: list[dict[str, Any]] = []
+    results = stats.get("results", [])
+    if not isinstance(results, list):
+        raise TypeError("MetaTFT stats results must be an array")
+    for row in results:
+        if not isinstance(row, dict):
+            continue
         cluster_id = str(row.get("cluster", ""))
         if not cluster_id or cluster_id not in clusters:
             continue
-        places = [int(count) for count in row["places"][:8]]
+        places_raw = row.get("places", [])
+        if not isinstance(places_raw, list):
+            continue
+        places = [int(count) for count in places_raw[:8]]
         count = sum(places)
         if count < min_count:
             continue
@@ -87,12 +105,12 @@ def fetch_current_comp_strength(
     }
 
 
-def write_comp_strength_snapshot(path: Path, payload: dict[str, object]) -> None:
+def write_comp_strength_snapshot(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def records_from_payload(payload: dict[str, object]) -> list[CompStrengthRecord]:
+def records_from_payload(payload: dict[str, Any]) -> list[CompStrengthRecord]:
     rows = payload["records"]
     if not isinstance(rows, list):
         raise TypeError("payload records must be a list")
@@ -114,7 +132,7 @@ def records_from_payload(payload: dict[str, object]) -> list[CompStrengthRecord]
     return records
 
 
-def _get_json(url: str) -> dict[str, object]:
+def _get_json(url: str) -> dict[str, Any]:
     request = Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"})
     with urlopen(request, timeout=30) as response:
         return json.loads(response.read().decode("utf-8"))

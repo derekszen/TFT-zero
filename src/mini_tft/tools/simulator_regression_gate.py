@@ -39,6 +39,7 @@ class RegressionGateConfig:
     trace_steps: int = 6
     level_episodes: int = 20
     min_mean_final_level: float = 8.0
+    max_mean_final_hp: float = 35.0
     run_smoke_report: bool = True
 
 
@@ -132,7 +133,8 @@ def format_markdown(report: dict[str, Any]) -> str:
             "- `combat_fixtures` checks explicit board-strength and win-probability orderings.",
             "- `candidate_boards` checks stronger legal board generation without state mutation.",
             "- `item_flow` checks scheduled PvE component drops and combine/slam behavior.",
-            "- `level_pacing` checks FastLevelBot still reaches level 8 on fixed seeds.",
+            "- `level_pacing` checks FastLevelBot still reaches level 8 without "
+            "coasting on HP.",
             "- `web_ui` checks browser payload defaults, enemy preview scaling, item "
             "actions, and moves.",
         ]
@@ -273,17 +275,21 @@ def _level_pacing_check(config: RegressionGateConfig) -> dict[str, Any]:
         hps.append(env.state.hp)
 
     mean_final_level = float(np.mean(levels)) if levels else 0.0
+    mean_final_hp = float(np.mean(hps)) if hps else 0.0
     survival_rate = float(np.mean([hp > 0 for hp in hps])) if hps else 0.0
     return _check(
         "level_pacing",
-        mean_final_level >= config.min_mean_final_level,
+        mean_final_level >= config.min_mean_final_level
+        and mean_final_hp <= config.max_mean_final_hp,
         {
             "episodes": config.level_episodes,
             "mean_final_level": round(mean_final_level, 3),
+            "mean_final_hp": round(mean_final_hp, 3),
             "min_final_level": min(levels) if levels else 0,
             "mean_survived_round": round(float(np.mean(rounds)), 3) if rounds else 0.0,
             "survival_rate": round(survival_rate, 3),
             "min_mean_final_level": config.min_mean_final_level,
+            "max_mean_final_hp": config.max_mean_final_hp,
         },
     )
 

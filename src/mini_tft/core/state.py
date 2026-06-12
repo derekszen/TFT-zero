@@ -43,6 +43,35 @@ class GameState:
     total_item_slams: int = 0
     total_illegal_actions: int = 0
 
+    def clone(self) -> GameState:
+        """Return an independent copy suitable for simulator branch/restore."""
+
+        return GameState(
+            seed=self.seed,
+            round=self.round,
+            hp=self.hp,
+            gold=self.gold,
+            level=self.level,
+            xp=self.xp,
+            shop=list(self.shop),
+            bench=[unit.clone() if unit is not None else None for unit in self.bench],
+            board=[unit.clone() if unit is not None else None for unit in self.board],
+            item_bench=list(self.item_bench),
+            done=self.done,
+            step_count=self.step_count,
+            round_action_count=self.round_action_count,
+            final_reason=self.final_reason,
+            last_board_strength=self.last_board_strength,
+            last_enemy_strength=self.last_enemy_strength,
+            last_win=self.last_win,
+            total_rolls=self.total_rolls,
+            total_xp_buys=self.total_xp_buys,
+            total_units_bought=self.total_units_bought,
+            total_units_sold=self.total_units_sold,
+            total_item_slams=self.total_item_slams,
+            total_illegal_actions=self.total_illegal_actions,
+        )
+
 
 def new_game_state(config: EnvConfig, seed: int, shop: list[int]) -> GameState:
     """Create a fresh episode state."""
@@ -78,6 +107,15 @@ def state_signature(state: GameState) -> tuple[object, ...]:
         state.step_count,
         state.round_action_count,
         state.final_reason,
+        state.last_board_strength,
+        state.last_enemy_strength,
+        state.last_win,
+        state.total_rolls,
+        state.total_xp_buys,
+        state.total_units_bought,
+        state.total_units_sold,
+        state.total_item_slams,
+        state.total_illegal_actions,
     )
 
 

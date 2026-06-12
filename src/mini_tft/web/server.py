@@ -9,14 +9,14 @@ from dataclasses import dataclass, field
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
 
 import numpy as np
 
 from mini_tft.bots.greedy_board_bot import GreedyBoardBot
 from mini_tft.core.actions import NUM_ACTIONS, Action, action_name
-from mini_tft.core.combat import board_strength
+from mini_tft.core.combat import board_strength, enemy_strength_for_round
 from mini_tft.core.config import EnvConfig
 from mini_tft.core.economy import xp_needed
 from mini_tft.core.env import MiniTFTEnv
@@ -169,9 +169,8 @@ def serialize_state(
 ) -> dict[str, Any]:
     state = env._require_state()
     stats = board_strength(state.board, env.data)
-    enemy_index = min(state.round - 1, len(env.data.enemy_curve) - 1)
     stage = round_info(state.round)
-    enemy_next = round(env.data.enemy_curve[enemy_index], 2)
+    enemy_next = round(enemy_strength_for_round(state.round, env.data, env.config), 2)
     mask = env.action_masks()
     active = active_trait_effects(state.board, env.data)
     counts = trait_counts(state.board, env.data)
@@ -309,7 +308,10 @@ def _serialize_item_action(env: MiniTFTEnv, mask: np.ndarray) -> dict[str, Any]:
         item = env.data.items[item_id]
         target = best_item_target(state.board, item_id, env.data, env.config)
         if target is not None and state.board[target] is not None:
-            unit = env.data.units[state.board[target].unit_id]
+            target_unit = state.board[target]
+            if target_unit is None:
+                raise RuntimeError("best item target disappeared while serializing item action")
+            unit = env.data.units[target_unit.unit_id]
             return {
                 "mode": "slam",
                 "label": f"Slam {item.name}",
@@ -510,7 +512,9 @@ class MiniTFTHTTPServer(ThreadingHTTPServer):
 
 
 class MiniTFTRequestHandler(BaseHTTPRequestHandler):
-    server: MiniTFTHTTPServer
+    @property
+    def _session(self) -> MiniTFTWebSession:
+        return cast(MiniTFTHTTPServer, self.server).session
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
@@ -524,7 +528,7 @@ class MiniTFTRequestHandler(BaseHTTPRequestHandler):
             self._serve_asset(parsed.path.removeprefix("/assets/"))
             return
         if parsed.path == "/api/state":
-            self._send_json(self.server.session.payload())
+            self._send_json(self._session.payload())
             return
         self.send_error(HTTPStatus.NOT_FOUND)
 
@@ -549,20 +553,20 @@ class MiniTFTRequestHandler(BaseHTTPRequestHandler):
             seed = body.get("seed") if isinstance(body, dict) else None
             if seed is None and "seed" in query:
                 seed = query["seed"][0]
-            self._send_json(self.server.session.reset(_coerce_seed(seed)))
+            self._send_json(self._session.reset(_coerce_seed(seed)))
             return
         if parsed.path == "/api/action":
             body = self._read_json()
             action = int(body.get("action", Action.END_TURN)) if isinstance(body, dict) else 0
-            self._send_json(self.server.session.step(action))
+            self._send_json(self._session.step(action))
             return
         if parsed.path == "/api/bot-step":
-            self._send_json(self.server.session.bot_step())
+            self._send_json(self._session.bot_step())
             return
         if parsed.path == "/api/move-unit":
             body = self._read_json()
             self._send_json(
-                self.server.session.move_unit(
+                self._session.move_unit(
                     from_zone=str(body.get("from_zone", "")),
                     from_index=int(body.get("from_index", -1)),
                     to_zone=str(body.get("to_zone", "")),

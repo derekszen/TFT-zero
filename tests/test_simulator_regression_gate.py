@@ -48,6 +48,19 @@ def test_simulator_regression_gate_fails_on_bad_level_threshold() -> None:
     assert "level_pacing" in report["failures"]
 
 
+def test_simulator_regression_gate_fails_on_bad_hp_threshold() -> None:
+    report = run_simulator_regression_gate(
+        RegressionGateConfig(
+            level_episodes=2,
+            max_mean_final_hp=-1.0,
+            run_smoke_report=False,
+        )
+    )
+
+    assert report["status"] == "fail"
+    assert "level_pacing" in report["failures"]
+
+
 def test_simulator_regression_gate_markdown_is_agent_readable() -> None:
     report = run_simulator_regression_gate(
         RegressionGateConfig(level_episodes=2, run_smoke_report=False)

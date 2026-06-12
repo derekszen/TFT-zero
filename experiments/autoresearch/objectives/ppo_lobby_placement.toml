@@ -1,0 +1,78 @@
+name = "ppo_lobby_placement"
+description = "Gate a PPO checkpoint as player 0 in the 8-player MiniTFT lobby."
+
+[environment]
+kind = "lobby"
+opponent_policy = "tempo"
+player_count = 8
+max_actions_per_player = 8
+
+[baseline]
+kind = "bot"
+name = "fast_level"
+
+[candidate]
+kind = "checkpoint"
+name = "ppo_1m_harder"
+path = "checkpoints/ppo_from_bc_fastlevel_1m_harder_h256.zip"
+
+[seed_sets.public]
+start = 1000
+episodes = 25
+
+[seed_sets.holdout]
+start = 1100
+episodes = 75
+
+[[acceptance.metrics]]
+name = "mean_placement"
+mode = "lower"
+min_delta = 0.15
+required = true
+
+[[acceptance.metrics]]
+name = "top4_rate"
+mode = "higher"
+min_delta = 0.03
+required = true
+
+[[acceptance.metrics]]
+name = "top1_rate"
+mode = "higher"
+min_delta = 0.01
+required = false
+
+[[acceptance.metrics]]
+name = "mean_final_hp"
+mode = "higher"
+min_delta = -10.0
+required = true
+
+[[acceptance.metrics]]
+name = "mean_final_board_strength"
+mode = "higher"
+min_delta = 0.0
+required = true
+
+[[acceptance.metrics]]
+name = "total_illegal_actions"
+mode = "lower"
+min_delta = 0.0
+required = true
+
+[safety]
+fail_on_protected_changes = true
+protected_paths = [
+  "src/mini_tft/core/combat.py",
+  "src/mini_tft/core/config.py",
+  "src/mini_tft/core/env.py",
+  "src/mini_tft/core/lobby.py",
+  "src/mini_tft/core/lobby_step.py",
+  "src/mini_tft/core/masks.py",
+  "src/mini_tft/rl/evaluate_policy.py",
+  "src/mini_tft/rl/lobby_env.py",
+  "src/mini_tft/tools/evaluate_lobby_policy.py",
+  "src/mini_tft/tools/*gate*.py",
+  "tests/test_lobby_env.py",
+  "tests/test_simulator_regression_gate.py",
+]

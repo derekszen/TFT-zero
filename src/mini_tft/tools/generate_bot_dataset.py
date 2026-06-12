@@ -5,9 +5,10 @@ from __future__ import annotations
 import argparse
 import os
 import time
+from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -40,7 +41,7 @@ def default_bots() -> list[BaseBot]:
 def bot_suite(name: str) -> list[BaseBot]:
     """Return a named bot suite for rollout generation."""
 
-    suites = {
+    suites: dict[str, Callable[[], list[BaseBot]]] = {
         "default": default_bots,
         "fastlevel": lambda: [FastLevelBot()],
         "expert": lambda: [
@@ -80,7 +81,7 @@ def generate_dataset_parallel(
     workers: int | None = None,
     chunk_size: int | None = None,
     bots: list[BaseBot] | None = None,
-) -> dict[str, float | int | str]:
+) -> dict[str, Any]:
     """Generate rollout data in worker processes and write one `.npz` file."""
 
     actual_workers = resolve_worker_count(workers, episodes)
@@ -155,7 +156,7 @@ def _generate_shard_for_bots(
     mask_rows = []
     episode_id_rows = []
     step_idx_rows = []
-    return_rows = []
+    return_rows: list[float] = []
 
     for episode_id in range(start_episode, start_episode + episodes):
         bot = bots[episode_id % len(bots)]
@@ -206,7 +207,8 @@ def _generate_shard_for_bots(
 
 def _write_dataset(output: Path, shard: dict[str, np.ndarray]) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(output, **shard)
+    savez_compressed = cast(Any, np.savez_compressed)
+    savez_compressed(output, **shard)
 
 
 def _merge_shards(shards: list[dict[str, np.ndarray]]) -> dict[str, np.ndarray]:

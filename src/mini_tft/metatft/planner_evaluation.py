@@ -24,9 +24,10 @@ class TurnPlanner(Protocol):
         *,
         shops: Sequence[Sequence[str]],
         unit_costs: Mapping[str, int] | None = None,
-        rank_by: str = "after_value",
+        rank_by: Literal["after_value", "delta"] = "after_value",
     ) -> PolicyTurnPlan:
         """Return a deterministic turn plan for a current-patch state."""
+        ...
 
 
 PlannerTraceMode = Literal[
@@ -35,7 +36,7 @@ PlannerTraceMode = Literal[
     "distractor-heavy",
     "multi-roll",
 ]
-PLANNER_TRACE_MODES: tuple[str, ...] = (
+PLANNER_TRACE_MODES: tuple[PlannerTraceMode, ...] = (
     "completion",
     "shop-planning",
     "distractor-heavy",

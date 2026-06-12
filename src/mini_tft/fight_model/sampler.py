@@ -36,7 +36,7 @@ def sample_staged_v1(
     if bucket == SamplingBucket.LATE:
         return _random_match(seed, bucket, rng, 7, 9, 2, 5, max_unit_id, max_item_id)
     if bucket == SamplingBucket.CLOSE:
-        base = _random_board(rng, rng.integers(5, 9), 2, 5, max_unit_id, max_item_id)
+        base = _random_board(rng, int(rng.integers(5, 9)), 2, 5, max_unit_id, max_item_id)
         board_b = _mutate_board(base, rng, max_unit_id, max_item_id)
         return FightSpec(
             base,
@@ -75,7 +75,8 @@ def _random_board(
     max_unit_id: int,
     max_item_id: int,
 ) -> FightBoard:
-    unit_count = int(min(level, rng.integers(max(1, level - 1), level + 1)))
+    sampled_count = int(rng.integers(max(1, level - 1), level + 1))
+    unit_count = min(level, sampled_count)
     positions = rng.choice(np.arange(28), size=unit_count, replace=False)
     units = []
     for unit_index in range(unit_count):

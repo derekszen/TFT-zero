@@ -20,21 +20,25 @@ items, board strength, opponent pressure, and final-board commitments.
 | # | Gap | Current state | Useful next version | Difficulty | Branch-sized? |
 | ---: | --- | --- | --- | --- | --- |
 | 1 | Real round/stage/PvE structure | Implemented: canonical Set-1-like stage labels, PvE rounds, stage-aware web payloads, and PvE component drops. | Remaining: tune exact PvE rewards/drops if the learning loop needs closer Set-1 fidelity. | Easy | Done for V0 |
-| 2 | 8-player lobby pressure | Main env is single-player against an enemy curve. | TODO: add a lobby shell with 8 player states, bot-controlled opponents, HP standings, pairings, and later a shared pool. | Medium to Hard | Later |
+| 2 | 8-player lobby pressure | Implemented V0: `MiniTFTLobbyEnv`, synchronized players, shared pool, board-vs-board scalar fights, HP standings, placement assignment, clone/restore, and placement metrics. | Remaining: ghost-army handling for odd player counts, stronger opponent distributions, and calibration against known lobby curves. | Medium to Hard | V0 done |
 | 3 | Better combat value model | Abstract scalar combat already includes roles, stars, items, traits, position multipliers, and assassin pressure. | Add stronger combat fixtures and calibration gates; tune symbolic combat from fixture outcomes before using it for RL claims. | Easy to Medium | Yes |
 | 4 | Real board placement / candidate boards | Implemented: slot-level move actions, manual browser moves, and top-k candidate-board generation. `FIELD_BEST_BOARD` still exists as a debug convenience. | Remaining: expose candidate-board choices as explicit policy actions or wrappers for training. | Easy to Medium | Yes |
 | 5 | Realistic item flow | Implemented: Set-1-like components, PvE component drops, deterministic component combine, best-target slam, and browser labels for combine/slam. | Remaining: explicit item-choice actions such as choose recipe, choose item, and choose target unit. | Medium | Yes |
-| 6 | Opponent policy distribution | Heuristic bots exist, but the main env does not use them as live lobby opponents. | TODO: connect bot archetypes into lobby pressure and enemy-board sampling. | Medium | Yes, after #2 shell |
-| 7 | Calibration/regression gates | Implemented: simulator gate covers throughput, determinism, round timing, item flow, combat fixtures, level pacing, candidate boards, and web UI payload behavior. | Remaining: add historical threshold tracking if CI starts collecting long-run metrics. | Easy | Done for V0 |
+| 6 | Opponent policy distribution | V0 lobby policy stepping supports fast-level, tempo, random, action plans, and checkpoint-as-hero evaluation. | Remaining: define a stable opponent-policy mixture and regression thresholds for placement/top-4, not only survival. | Medium | Yes |
+| 7 | Calibration/regression gates | Implemented: full pytest/ruff/Pyright gates plus simulator gate coverage for throughput, determinism, round timing, item flow, combat fixtures, level pacing, opponent-pressure HP caps, candidate boards, and web UI payload behavior. | Remaining: add historical threshold tracking if CI starts collecting long-run metrics. | Easy | Done for V0 |
+| 8 | Search snapshot boundary | Implemented: `GameState.clone()` plus `MiniTFTEnv.clone_state()` / `restore_state()` capture state and RNG for deterministic branch replay. | Remaining: add search-specific throughput benchmarks and MCTS budget gates. | Easy to Medium | Yes |
 
 ## Current Recurring Gates
 
-Run these before simulator, planner, reward, or browser-playability changes:
+Run these before simulator, planner, reward, search, or browser-playability changes:
 
 ```bash
-uv run pytest -q tests/test_web_ui.py tests/test_web_ui_regression_gate.py
+uv run pytest
+uv run ruff check
+uv run --all-extras pyright
 uv run python -m mini_tft.tools.web_ui_regression_gate --strict
 uv run python -m mini_tft.tools.simulator_regression_gate --strict
+uv run python -m mini_tft.tools.set1_lobby_step_smoke --strict
 ```
 
 Use the web UI gate when changing browser payloads, enemy previews, item
@@ -148,7 +152,7 @@ Scope:
 
 - Add one recurring simulator realism gate command.
 - Report throughput, determinism, round timing, item timing, combat fixture pass
-  rate, level pacing, and candidate-board quality.
+  rate, level pacing, opponent-pressure HP caps, and candidate-board quality.
 - Emit compact Markdown by default and JSON for pipelines.
 
 Acceptance:
@@ -162,22 +166,24 @@ uv run python -m mini_tft.tools.simulator_regression_gate --strict
 
 These should not be assigned as one large branch.
 
-### Full 8-Player Lobby With Shared Pool
+### Lobby V1 Fidelity
 
 Why it is hard:
 
-- Shared pool changes shop odds and roll EV.
-- Player action order can bias contested units.
-- Opponent pairings and simultaneous rounds need deterministic clone/restore
-  behavior for search and reproducibility.
+- The V0 shared pool changes shop odds and roll EV, but it still uses simple
+  pairings and scalar combat.
+- Player action order can bias contested units, so placement comparisons should
+  use random or rotating order.
+- Odd-player lobbies need ghost-board handling instead of byes.
+- Opponent policy distributions need fixed suites before placement can become a
+  stable regression metric.
 
 Split into:
 
-- lobby state and round stepping
-- shared pool buy/sell/upgrade accounting
-- rotating/randomized action order
-- Gymnasium/PettingZoo-style wrapper
-- throughput and determinism gates
+- ghost-board fights for odd active counts
+- opponent-policy mixture suites
+- placement/top-4 regression thresholds
+- native PufferEnv/C++ parity for the hot loop after Python behavior is stable
 
 ### Accurate Combat Engine
 
@@ -215,9 +221,9 @@ Preferred approach:
 3. Item components V0.
 4. Candidate-board actions.
 5. Simulator regression gate.
-6. Lobby shell V0.
-7. Opponent policy distribution.
-8. Shared unit pool.
+6. Opponent policy distribution.
+7. Lobby placement/top-4 regression thresholds.
+8. Native Puffer/C++ parity for lobby stepping.
 
 This order keeps each branch testable and avoids turning the simulator into a
 slow exact-combat project before the RL loop needs it.

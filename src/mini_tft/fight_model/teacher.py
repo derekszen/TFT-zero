@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Protocol
+from typing import Any, Protocol, cast
 
 import numpy as np
 
@@ -22,6 +22,7 @@ class FightTeacher(Protocol):
 
     def simulate(self, spec: FightSpec) -> FightLabel:
         """Return a deterministic label for a fight spec."""
+        ...
 
 
 @dataclass
@@ -88,10 +89,12 @@ class TFTMuZeroSet4Teacher:
         self._agent_stats = importlib.import_module("Simulator.default_agent_stats")
         self._item_stats = importlib.import_module("Simulator.item_stats")
         self._global_config = importlib.import_module("config")
-        self._global_config.AUTO_BATTLER_PERCENTAGE = 0
-        self._global_config.DEBUG = False
-        self._sim_config.LOGMESSAGES = False
-        self._sim_config.PRINTMESSAGES = False
+        global_config = cast(Any, self._global_config)
+        sim_config = cast(Any, self._sim_config)
+        global_config.AUTO_BATTLER_PERCENTAGE = 0
+        global_config.DEBUG = False
+        sim_config.LOGMESSAGES = False
+        sim_config.PRINTMESSAGES = False
 
         unit_lists = [
             self._agent_stats.ONE_COST_UNITS,

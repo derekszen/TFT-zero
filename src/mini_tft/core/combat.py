@@ -139,8 +139,9 @@ def resolve_combat(
     rng: np.random.Generator,
 ) -> CombatResult:
     stats = board_strength(board, data)
-    enemy_index = min(round_num - 1, len(data.enemy_curve) - 1)
-    enemy_strength = data.enemy_curve[enemy_index] + float(rng.normal(0.0, config.combat_noise_std))
+    enemy_strength = enemy_strength_for_round(round_num, data, config) + float(
+        rng.normal(0.0, config.combat_noise_std)
+    )
     enemy_strength = max(0.0, enemy_strength - stats.enemy_power_penalty)
     has_board_units = any(unit is not None for unit in board)
     if not has_board_units and enemy_strength > 0.0:
@@ -166,6 +167,11 @@ def resolve_combat(
         enemy_strength=enemy_strength,
         p_win=p_win,
     )
+
+
+def enemy_strength_for_round(round_num: int, data: GameData, config: EnvConfig) -> float:
+    enemy_index = min(max(0, round_num - 1), len(data.enemy_curve) - 1)
+    return float(data.enemy_curve[enemy_index] * config.enemy_strength_multiplier)
 
 
 def base_damage_by_round(round_num: int) -> int:

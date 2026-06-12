@@ -1,33 +1,63 @@
-# Training Plan
+# Training
 
-Start simple.
+Training work is staged. Standard policy learning comes first; search and
+MuZero-style planning come after the simulator, logs, and baselines are reliable.
 
-## First Baseline
+## 1. Current Baseline
 
-Train PPO or behavioral cloning before trying MuZero-style planning.
+Toy Set-1-like simulator results use `mini_tft.core.combat`, not current-patch
+MetaTFT value or real combat.
 
-This answers the first practical question:
+The latest documented 5M PPO continuation was measured on 2026-05-31 over fixed
+eval seeds `1000..1499`.
 
-Can the environment produce a signal that a standard policy optimizer can learn?
+| Policy | Mean final HP | Survival rate | Mean survived round | Mean final strength |
+| --- | ---: | ---: | ---: | ---: |
+| RandomBot | 0.19 | 0.016 | 30.458 | 123.20 |
+| GreedyBoardBot | 0.00 | 0.000 | 31.578 | 119.03 |
+| EconBot | 0.00 | 0.00 | 20.46 | 0.00 |
+| RerollBot | 0.00 | 0.000 | 28.242 | 73.42 |
+| TraitCommitBot[ranger] | 31.542 | 0.948 | 35.984 | 249.00 |
+| FastLevelBot | 68.812 | 0.986 | 35.994 | 300.75 |
+| PPO from BC 5M/h256 | 77.100 | 0.984 | 35.970 | 336.66 |
 
-## Behavioral Cloning
+Interpretation:
 
-Use bot data to train a weak policy quickly.
+- PPO builds stronger final boards than `FastLevelBot` under the toy scalar
+  combat formula.
+- Survival is effectively tied: PPO has higher HP/strength, but `0.984`
+  survival versus `0.986` for `FastLevelBot`.
+- This is not a human-rank or real TFT benchmark.
 
-Inputs:
+## 2. Guardrails
 
-- observation tensors
-- legal action mask
-- scripted bot action
+Run these before trusting a new training result:
 
-Outputs:
+```bash
+uv run pytest
+uv run ruff check
+uv run --all-extras pyright
+```
 
-- masked action distribution
+For simulator, reward, item, board, or search changes also run:
 
-This is useful even if the policy is mediocre. It provides a starting policy and
-debugs the featurization path.
+```bash
+uv run python -m mini_tft.tools.simulator_regression_gate --strict
+```
 
-Current command shape:
+Training scripts write checkpoint sidecar manifests:
+
+```text
+checkpoint.zip
+checkpoint.manifest.json
+```
+
+The manifest records CLI args, resolved batch/rollout settings, git metadata,
+package versions, elapsed time, and whether timesteps were reset.
+
+## 3. Behavioral Cloning
+
+Use scripted bot data to quickly debug the observation, mask, and action path.
 
 ```bash
 uv run python -m mini_tft.tools.generate_bot_dataset \
@@ -45,27 +75,24 @@ uv run python -m mini_tft.rl.pretrain_bc \
   --out checkpoints/bc_fastlevel_5k_e80_h256
 ```
 
-## PPO
+BC is not the end goal. It gives PPO a reasonable starting policy and catches
+featurization or mask bugs earlier than a long RL run.
 
-Use MaskablePPO after the env can run many short episodes without crashing.
-Install it through the `train` extra, which includes `sb3-contrib`.
+## 4. PPO
+
+Use MaskablePPO after the env can run many short episodes without illegal-action
+or termination issues.
 
 Track:
 
 - episode return
-- survival round
-- final HP
+- survival round and final HP
+- final board strength
 - illegal action rate
-- roll count
-- XP buy count
-- bench overflow attempts
-- trait diversity
+- roll count and XP buy count
+- bench overflow or blocked action patterns
 
-If PPO cannot beat random, do not jump to MuZero. First inspect rewards, action
-masks, episode length, observation quality, and whether scripted bots can show a
-clear skill gradient.
-
-Warm-start PPO from the BC checkpoint:
+Warm-start PPO:
 
 ```bash
 uv run python -m mini_tft.rl.train_ppo \
@@ -74,198 +101,123 @@ uv run python -m mini_tft.rl.train_ppo \
   --num-envs 8 \
   --n-steps 256 \
   --batch-size 2048 \
+  --learning-rate 3e-4 \
   --device cpu \
   --out checkpoints/ppo_from_bc_fastlevel_250k_h256
+```
 
+Resume behavior is explicit: `learning_rate`, `n_steps`, and `batch_size` are
+passed through `MaskablePPO.load(custom_objects=...)`. The command prints the
+resolved config before training and writes it to the manifest.
+
+Evaluate:
+
+```bash
 uv run python -m mini_tft.rl.evaluate_policy \
   --episodes 100 \
   --checkpoint checkpoints/ppo_from_bc_fastlevel_250k_h256.zip
 ```
 
-## Current Baseline
+## 5. Lobby Placement Evaluation
 
-Toy Set-1-like simulator results. These use the handcrafted abstract combat
-model in `mini_tft.core.combat`, not the current-patch MetaTFT value path.
+Single-player survival is not the same thing as first place. Use the lobby
+evaluator when the question is placement, top-4, or final HP against live
+scripted opponents:
 
-The latest 5M PPO continuation was measured on 2026-05-31 with fixed eval seeds
-`1000..1499`.
+```bash
+uv run python -m mini_tft.tools.evaluate_lobby_policy \
+  --episodes 100 \
+  --hero-policy fast_level \
+  --opponent-policy tempo \
+  --format markdown
 
-| Policy | Mean final HP | Survival rate | Mean survived round | Mean final strength |
-| --- | ---: | ---: | ---: | ---: |
-| RandomBot | 0.19 | 0.016 | 30.458 | 123.20 |
-| GreedyBoardBot | 0.00 | 0.000 | 31.578 | 119.03 |
-| EconBot | 0.00 | 0.00 | 20.46 | 0.00 |
-| RerollBot | 0.00 | 0.000 | 28.242 | 73.42 |
-| TraitCommitBot[ranger] | 31.542 | 0.948 | 35.984 | 249.00 |
-| FastLevelBot | 68.812 | 0.986 | 35.994 | 300.75 |
-| PPO from BC 5M/h256 | 77.100 | 0.984 | 35.970 | 336.66 |
+uv run python -m mini_tft.tools.evaluate_lobby_policy \
+  --episodes 100 \
+  --checkpoint checkpoints/ppo_from_bc_fastlevel_250k_h256.zip \
+  --opponent-policy tempo \
+  --format json
+```
 
-Run notes:
+Track:
 
-- 5k FastLevel data generation: `677147` transitions in `39.854s`
-  (`16990.7` transitions/sec) with `--workers 0`.
-- 5k/e80/h256 BC pretraining: validation masked-action accuracy peaked around
-  `0.923`.
-- 250k PPO continuation ran at about `2405` env steps/sec on CPU and beat the
-  current strongest heuristic, `FastLevelBot`, on the 100-seed eval.
-- 5M GPU PPO continuation from `runs/ppo_gpu_smoke_50k_from_bc_h256.zip` took
-  `6502s` wall time. Final training log reported `769` env steps/sec at
-  `5,304,320` cumulative timesteps. The checkpoint is
-  `checkpoints/ppo_from_bc_fastlevel_5m_h256.zip`.
+- mean placement and placement histogram
+- top-1 and top-4 rate
+- final HP and survived round
+- final board strength
+- total actions, fights, and illegal actions
 
-Interpretation:
+The lobby is still a Set-1-like toy reference. It is the right benchmark for
+placement-shaped learning, but not a real TFT rank claim.
 
-- The 5M PPO checkpoint builds stronger final boards than `FastLevelBot` under
-  the toy simulator's scalar board-strength formula.
-- Survival is effectively tied at this horizon: PPO had higher HP/strength but
-  `0.984` survival versus `0.986` for `FastLevelBot` on 500 seeds.
-- These numbers are not a human-rank benchmark and should not be compared to
-  Bronze/Gold real TFT players.
+## 6. Search And MuZero Path
 
-## World Model
+MuZero-style or simulator-backed MCTS should build on the toy simulator first,
+not the current-patch planner shell.
 
-After rollout logs exist, train:
+Current search-ready pieces:
+
+- `GameState.clone()` deep-copies mutable state.
+- `MiniTFTEnv.clone_state()` captures game state plus RNG state.
+- `MiniTFTEnv.restore_state()` restores deterministic search branches.
+- `MiniTFTLobbyEnv.clone_state()` captures lobby state, shared pool, RNG state,
+  placements, and player-order rotation.
+- Tests verify exact stochastic branch replay and alias safety.
+
+Next requirements before serious search training:
+
+1. Add a search benchmark for clone/sec, step/sec, and rollout/sec.
+2. Define a per-decision simulation budget, such as 32, 64, 128, or 256 sims.
+3. Keep action masks as the planner's legal-action contract.
+4. Log search depth, node count, value target, and wall-clock cost in manifests.
+
+Do not jump to MuZero if PPO cannot beat random or scripted baselines. First
+inspect rewards, action masks, episode length, observation quality, and whether
+scripted bots show a clear skill gradient.
+
+## 7. PufferLib
+
+PufferLib is a rollout-throughput layer, not a quality fix.
+
+Use it when:
+
+- the env semantics are stable;
+- PPO/BC logs are reproducible;
+- rollout collection is the bottleneck;
+- simulator gates still pass under the wrapper.
+
+Do not use it to hide weak value labels, bad action pacing, missing unit costs,
+or a poor board-state abstraction.
+
+Recommended path:
+
+1. Keep the Python `MiniTFTLobbyEnv` as the correctness reference.
+2. Wrap the Gymnasium env with PufferLib only after tests and placement metrics
+   are stable.
+3. Port the hot lobby step loop to native `PufferEnv`/C++ only when profiling
+   shows Python rollout throughput is the bottleneck.
+4. Require parity tests against the Python lobby before using native results for
+   training claims.
+
+## 8. Current-Patch And Fight Value
+
+The current-patch path is a value/planner track today, not a full RL env.
+
+High-level flow:
 
 ```text
-state, action -> next state, reward, done
+MetaTFT aggregate snapshot
+  -> rich catalog
+  -> current-patch encoder/value model
+  -> target-guided shop/econ planner
+  -> planner gates
 ```
 
-Use it for:
+Fight-value work is separate. The Set 4 teacher path can train `FightValueNet`,
+but that checkpoint is not a validated current-patch combat oracle. `MiniTFTEnv`
+rejects MetaTFT current-patch value checkpoints until the simulator uses the same
+unit namespace.
 
-- representation learning
-- value pretraining
-- rollout sanity checks
-- later planning experiments
+See:
 
-## Fight Value Model
-
-Detailed combat is now separated into a teacher-label pipeline. Generate labels
-with the vendored TFTMuZeroAgent Set 4 teacher, train `FightValueNet`, and
-benchmark GPU inference before using it inside RL:
-
-```bash
-uv run python -m mini_tft.tools.generate_fight_labels \
-  --teacher tft-muzero \
-  --target-fights 1000000 \
-  --workers 12 \
-  --shard-size 10000 \
-  --out data/fight_labels/set4_teacher_v1
-
-uv run python -m mini_tft.rl.train_fight_value_model \
-  --dataset data/fight_labels/set4_teacher_v1 \
-  --device cuda \
-  --batch-size 16384 \
-  --epochs 10 \
-  --out checkpoints/fight_value/set4_teacher_v1.pt
-```
-
-See `docs/FIGHT_VALUE_MODEL.md` for smoke commands and benchmark details.
-
-The learned fight path is now wired behind `EnvConfig(combat_model="fight_value")`,
-but it should stay out of RL rewards/search until:
-
-```bash
-uv run python -m mini_tft.tools.calibrate_fight_value_model \
-  --checkpoint checkpoints/fight_value/set4_teacher_v1.pt \
-  --fixture tests/fixtures/metatft_set17_comp_strength_2026-05-31.json \
-  --device cuda \
-  --fail-on-threshold
-```
-
-passes against real comp ranking data.
-
-The Set 4 teacher checkpoint is intentionally treated as stale for current-patch
-MetaTFT work. To adapt the value model to the current patch, fetch a MetaTFT
-aggregate snapshot and train the current-patch ranking adapter:
-
-```bash
-uv run python -m mini_tft.tools.fetch_metatft_comp_strength \
-  --out data/metatft/current_comp_strength.json \
-  --min-count 3000
-
-uv run python -m mini_tft.rl.train_metatft_fight_value_model \
-  --train-fixture data/metatft/current_comp_strength.json \
-  --eval-fixture tests/fixtures/metatft_set17_comp_strength_2026-05-31.json \
-  --device cuda \
-  --epochs 4000 \
-  --out checkpoints/fight_value/metatft_current_patch.pt
-```
-
-That current-patch checkpoint is a MetaTFT comp ranker, not a drop-in MiniTFT
-combat model. `MiniTFTEnv` rejects it until the simulator uses the same
-current-patch unit namespace.
-
-## PufferLib Usefulness
-
-PufferLib is useful here as a rollout-throughput layer once the environment and
-policy semantics are stable. Its main benefit is vectorized custom-env training
-with serial or multiprocessing workers and less Python overhead than a plain
-single-env loop. For this project, use it after the current-patch symbolic
-shop/econ policy produces sane traces and after reward/value labels are
-calibrated.
-
-Do not use PufferLib to hide model-quality problems. It will not fix weak
-MetaTFT value generalization, bad action pacing, missing unit costs, or an
-incorrect board-state abstraction. The current order should be:
-
-```text
-1. validate current-patch board/value labels
-2. produce sane planner traces
-3. add RL around that loop
-4. use PufferLib if rollout collection becomes the bottleneck
-```
-
-## PPO Overnight Candidate
-
-The strongest checked toy-simulator checkpoint is currently the BC-warmed PPO
-line. A short GPU continuation from
-`checkpoints/ppo_from_bc_fastlevel_250k_h256.zip` improved the 30-seed mean final
-HP from `70.5` to `72.5` and kept survival at `1.0`.
-
-Smoke command:
-
-```bash
-uv run python -m mini_tft.rl.train_ppo \
-  --timesteps 50000 \
-  --seed 42 \
-  --num-envs 8 \
-  --n-steps 512 \
-  --batch-size 2048 \
-  --learning-rate 1e-4 \
-  --device cuda \
-  --init checkpoints/ppo_from_bc_fastlevel_250k_h256.zip \
-  --out runs/ppo_gpu_smoke_50k_from_bc_h256
-```
-
-Completed 5M continuation command:
-
-```bash
-uv run python -m mini_tft.rl.train_ppo \
-  --timesteps 5000000 \
-  --seed 100 \
-  --num-envs 8 \
-  --n-steps 512 \
-  --batch-size 2048 \
-  --learning-rate 1e-4 \
-  --device cuda \
-  --init runs/ppo_gpu_smoke_50k_from_bc_h256.zip \
-  --out checkpoints/ppo_from_bc_fastlevel_5m_h256
-```
-
-The resume path now passes `learning_rate`, `n_steps`, and `batch_size` through
-`MaskablePPO.load(custom_objects=...)`; verify logs show the requested learning
-rate before launching long runs.
-
-Evaluation command:
-
-```bash
-uv run python -m mini_tft.rl.evaluate_policy \
-  --episodes 500 \
-  --checkpoint checkpoints/ppo_from_bc_fastlevel_5m_h256.zip
-```
-
-## MuZero Later
-
-MuZero-style latent planning fits TFT-like uncertainty better than AlphaZero,
-but it should be a later phase. It needs a reliable env, clean logs, and baseline
-policies first.
+- [Current-Patch MetaTFT](CURRENT_PATCH_METATFT.md)
+- [Fight Value Model](FIGHT_VALUE_MODEL.md)

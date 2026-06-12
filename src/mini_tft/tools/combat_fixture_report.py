@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from math import exp
 from typing import Any
 
-from mini_tft.core.combat import CombatStats, board_strength
+from mini_tft.core.combat import CombatStats, board_strength, enemy_strength_for_round
 from mini_tft.core.config import EnvConfig
 from mini_tft.core.set_data import GameData, load_set
 from mini_tft.core.state import UnitInstance
@@ -233,8 +233,10 @@ def _deterministic_win_probability(
     data: GameData,
     config: EnvConfig,
 ) -> float:
-    enemy_index = min(max(0, round_num - 1), len(data.enemy_curve) - 1)
-    enemy_strength = max(0.0, data.enemy_curve[enemy_index] - stats.enemy_power_penalty)
+    enemy_strength = max(
+        0.0,
+        enemy_strength_for_round(round_num, data, config) - stats.enemy_power_penalty,
+    )
     diff = stats.strength - enemy_strength
     return 1.0 / (1.0 + exp(-(diff / config.combat_sigmoid_scale)))
 

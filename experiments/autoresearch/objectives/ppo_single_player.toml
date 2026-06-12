@@ -1,0 +1,58 @@
+name = "ppo_single_player_survival"
+description = "Gate a PPO checkpoint against FastLevelBot on paired single-player MiniTFT seeds."
+
+[environment]
+kind = "single_player"
+
+[baseline]
+kind = "bot"
+name = "fast_level"
+
+[candidate]
+kind = "checkpoint"
+name = "ppo_1m_harder"
+path = "checkpoints/ppo_from_bc_fastlevel_1m_harder_h256.zip"
+
+[seed_sets.public]
+start = 1000
+episodes = 25
+
+[seed_sets.holdout]
+start = 1100
+episodes = 75
+
+[[acceptance.metrics]]
+name = "survival_rate"
+mode = "higher"
+min_delta = 0.03
+required = true
+
+[[acceptance.metrics]]
+name = "mean_final_board_strength"
+mode = "higher"
+min_delta = 5.0
+required = true
+
+[[acceptance.metrics]]
+name = "mean_survived_round"
+mode = "higher"
+min_delta = 0.25
+required = true
+
+[[acceptance.metrics]]
+name = "mean_final_hp"
+mode = "higher"
+min_delta = -10.0
+required = true
+
+[safety]
+fail_on_protected_changes = true
+protected_paths = [
+  "src/mini_tft/core/rewards.py",
+  "src/mini_tft/core/combat.py",
+  "src/mini_tft/core/masks.py",
+  "src/mini_tft/core/env.py",
+  "src/mini_tft/rl/evaluate_policy.py",
+  "src/mini_tft/tools/*gate*.py",
+  "tests/test_simulator_regression_gate.py",
+]

@@ -31,7 +31,12 @@ class EnvConfig:
     win_gold: int = 1
     combat_noise_std: float = 3.0
     combat_sigmoid_scale: float = 12.0
+    enemy_strength_multiplier: float = 1.12
     combat_model: str = "abstract"
     fight_value_checkpoint: str | None = None
     fight_value_device: str = "cpu"
     item_drop_interval: int = 4
+
+    def __post_init__(self) -> None:
+        if self.enemy_strength_multiplier <= 0.0:
+            raise ValueError("enemy_strength_multiplier must be positive")

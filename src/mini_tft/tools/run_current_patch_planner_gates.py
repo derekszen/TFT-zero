@@ -9,6 +9,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import asdict
 from pathlib import Path
+from typing import Any, cast
 
 from mini_tft.metatft import (
     PLANNER_TRACE_MODES,
@@ -89,8 +90,8 @@ def main() -> None:
         if unit.cost is not None and unit.cost > 0
     }
 
-    mode_reports = []
-    failures = []
+    mode_reports: list[dict[str, Any]] = []
+    failures: list[dict[str, Any]] = []
     for mode in modes:
         max_actions = mode_max_actions(mode, override=args.max_actions)
         policy = CurrentPatchShopEconPolicy(
@@ -164,7 +165,7 @@ def trace_modes_for_suite(
         if not modes:
             raise ValueError("--trace-modes must include at least one mode")
         _validate_trace_modes(modes)
-        return modes
+        return cast(tuple[PlannerTraceMode, ...], modes)
     if suite == "minimum":
         return MINIMUM_GATE_MODES
     if suite == "strict":
@@ -180,7 +181,7 @@ def mode_max_actions(mode: PlannerTraceMode, *, override: int | None = None) -> 
     return DEFAULT_MODE_MAX_ACTIONS[mode]
 
 
-def compact_gate_suite_payload(payload: dict[str, object]) -> dict[str, object]:
+def compact_gate_suite_payload(payload: dict[str, Any]) -> dict[str, Any]:
     reports = payload.get("reports", ())
     if not isinstance(reports, list):
         reports = []
@@ -210,7 +211,7 @@ def compact_gate_suite_payload(payload: dict[str, object]) -> dict[str, object]:
     }
 
 
-def _action_mix(report) -> dict[str, int]:
+def _action_mix(report: Any) -> dict[str, int]:
     counts = Counter(
         action_type
         for trace in report.traces

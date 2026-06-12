@@ -33,6 +33,7 @@ class TransitionScorer(Protocol):
         rank_by: RankBy = "after_value",
     ) -> tuple[ScoredTransition, ...]:
         """Rank candidate transitions from best to worst."""
+        ...
 
 
 @dataclass(frozen=True)

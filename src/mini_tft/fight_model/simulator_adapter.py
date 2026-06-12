@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 import torch
 
-from mini_tft.core.combat import CombatResult, base_damage_by_round
+from mini_tft.core.combat import CombatResult, base_damage_by_round, enemy_strength_for_round
 from mini_tft.core.config import EnvConfig
 from mini_tft.core.set_data import GameData
 from mini_tft.core.state import UnitInstance
@@ -89,7 +89,7 @@ class FightValueCombatModel:
                 "score MiniTFT integer unit IDs directly"
             )
         board_a = mini_board_to_fight_board(board)
-        enemy_board, enemy_strength = enemy_proxy_board(round_num, data)
+        enemy_board, enemy_strength = enemy_proxy_board(round_num, data, config)
         return self.predict_matchup(
             board_a,
             enemy_board,
@@ -161,9 +161,12 @@ def mini_board_to_fight_board(board: list[UnitInstance | None]) -> FightBoard:
     return FightBoard(units=tuple(units), level=max(1, min(MAX_UNITS, len(units) or 1)))
 
 
-def enemy_proxy_board(round_num: int, data: GameData) -> tuple[FightBoard, float]:
-    enemy_index = min(max(0, round_num - 1), len(data.enemy_curve) - 1)
-    enemy_strength = float(data.enemy_curve[enemy_index])
+def enemy_proxy_board(
+    round_num: int,
+    data: GameData,
+    config: EnvConfig,
+) -> tuple[FightBoard, float]:
+    enemy_strength = enemy_strength_for_round(round_num, data, config)
     level = max(1, min(MAX_UNITS, 3 + round_num // 4))
     unit_ids = sorted(
         data.units,

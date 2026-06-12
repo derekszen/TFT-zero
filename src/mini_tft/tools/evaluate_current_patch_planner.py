@@ -8,12 +8,14 @@ import sys
 from collections.abc import Sequence
 from dataclasses import asdict
 from pathlib import Path
+from typing import cast
 
 from mini_tft.metatft import (
     PLANNER_TRACE_MODES,
     CurrentPatchShopEconPolicy,
     PlannerGateMetric,
     PlannerMetricRequirement,
+    PlannerTraceMode,
     ShopEconPolicyConfig,
     evaluate_planner_batch_gate,
     evaluate_planner_trace_batch,
@@ -77,6 +79,7 @@ def main() -> None:
         device_name=args.device,
         config=ShopEconPolicyConfig(max_actions_per_turn=args.max_actions),
     )
+    trace_mode = cast(PlannerTraceMode, args.trace_mode)
     report = evaluate_planner_trace_batch(
         catalog,
         policy,
@@ -86,7 +89,7 @@ def main() -> None:
         match_levels=_parse_ints(args.match_levels, "--match-levels"),
         top_k=args.top_k,
         min_recall=args.min_recall,
-        trace_mode=args.trace_mode,
+        trace_mode=trace_mode,
     )
     gate = evaluate_planner_batch_gate(
         report,

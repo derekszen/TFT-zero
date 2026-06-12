@@ -34,7 +34,7 @@ class ItemDef:
     tags: tuple[str, ...]
     effects: dict[str, float]
     kind: str = "completed"
-    components: tuple[int, int] = ()
+    components: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -50,7 +50,7 @@ class GameData:
     max_item_id: int
     component_item_ids: tuple[int, ...]
     completed_item_ids: tuple[int, ...]
-    item_recipes: dict[tuple[int, int], int]
+    item_recipes: dict[tuple[int, ...], int]
 
 
 def load_set(name: str = "set1") -> GameData:

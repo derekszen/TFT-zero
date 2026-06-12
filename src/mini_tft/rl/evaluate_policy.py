@@ -87,7 +87,7 @@ def main() -> None:
     parser.add_argument("--checkpoint", type=Path, default=None)
     args = parser.parse_args()
     seeds = range(1000, 1000 + args.episodes)
-    bots = [
+    bots: list[BaseBot] = [
         RandomBot(),
         GreedyBoardBot(),
         EconBot(),

@@ -525,7 +525,7 @@ def _detail_augment_keys(details: dict[str, Any]) -> set[str]:
 
 
 def _detail_item_keys(details: dict[str, Any]) -> set[str]:
-    item_keys = set()
+    item_keys: set[str] = set()
     for build in details.get("builds", ()):
         if isinstance(build, dict):
             item_keys.update(str(item) for item in build.get("buildName", ()) if item)

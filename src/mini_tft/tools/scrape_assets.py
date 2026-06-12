@@ -6,6 +6,7 @@ import argparse
 import json
 import re
 from pathlib import Path
+from typing import Any, cast
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
@@ -21,12 +22,12 @@ def download_unit_icons(
     version: str = DEFAULT_DDRAGON_VERSION,
     dataset: str = "set1",
     overwrite: bool = False,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     """Download unit icons and write `assets/manifest.json`."""
 
     data = load_set(dataset)
     champion_data = _fetch_json(CHAMPION_DATA_URL.format(version=version))
-    champions = champion_data["data"]
+    champions = cast(dict[str, dict[str, Any]], champion_data["data"])
     champions_by_name = {
         _normalize_name(champion["name"]): champion
         for champion in champions.values()
@@ -35,7 +36,7 @@ def download_unit_icons(
     units_dir = output_root / "units"
     units_dir.mkdir(parents=True, exist_ok=True)
 
-    manifest: dict[str, object] = {
+    manifest: dict[str, Any] = {
         "source": {
             "name": "Riot Data Dragon",
             "version": version,
@@ -77,7 +78,7 @@ def download_unit_icons(
     return manifest
 
 
-def _fetch_json(url: str) -> dict[str, object]:
+def _fetch_json(url: str) -> dict[str, Any]:
     with urlopen(url, timeout=30) as response:
         return json.loads(response.read().decode("utf-8"))
 

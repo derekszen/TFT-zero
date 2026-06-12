@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import gymnasium as gym
@@ -38,6 +40,14 @@ if TYPE_CHECKING:
     from mini_tft.fight_model.simulator_adapter import FightValueCombatModel
 
 
+@dataclass(frozen=True)
+class EnvSnapshot:
+    """Complete simulator snapshot for deterministic search branches."""
+
+    state: GameState
+    rng_state: dict[str, Any]
+
+
 class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
     """Single-player Set-1-like abstract TFT simulator."""
 
@@ -66,7 +76,7 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
         super().reset(seed=seed, options=options)
         actual_seed = self.config.seed if seed is None else seed
         if actual_seed is None:
-            actual_seed = int(np.random.SeedSequence().entropy)
+            actual_seed = int(np.random.default_rng().integers(0, np.iinfo(np.int64).max))
         self.rng = np.random.default_rng(actual_seed)
         shop = sample_shop(self.data, self.config.starting_level, self.config.shop_size, self.rng)
         self.state = new_game_state(self.config, actual_seed, shop)
@@ -119,7 +129,21 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
         state = self._require_state()
         return legal_action_mask(state, self.data, self.config)
 
-    def render(self) -> str:
+    def clone_state(self) -> EnvSnapshot:
+        """Return a restorable snapshot of mutable game and RNG state."""
+
+        return EnvSnapshot(
+            state=self._require_state().clone(),
+            rng_state=deepcopy(dict(self.rng.bit_generator.state)),
+        )
+
+    def restore_state(self, snapshot: EnvSnapshot) -> None:
+        """Restore a snapshot produced by `clone_state`."""
+
+        self.state = snapshot.state.clone()
+        self.rng.bit_generator.state = deepcopy(snapshot.rng_state)
+
+    def render(self) -> Any:
         from mini_tft.tools.render_text import render_state
 
         return render_state(self)
@@ -230,6 +254,15 @@ class MiniTFTEnv(gym.Env[NDArray[np.float32], int]):
         combat_round = state.round
         previous_strength = state.last_board_strength
         result = self._resolve_combat(state)
+        return self._apply_round_result(state, combat_round, previous_strength, result)
+
+    def _apply_round_result(
+        self,
+        state: GameState,
+        combat_round: int,
+        previous_strength: float,
+        result: CombatResult,
+    ) -> float:
         state.last_board_strength = result.my_strength
         state.last_enemy_strength = result.enemy_strength
         state.last_win = result.won

@@ -43,12 +43,14 @@ def main() -> None:
             min_count=args.min_count,
         )
         write_comp_strength_snapshot(args.out, payload)
+    records = payload.get("records", [])
+    records_count = len(records) if isinstance(records, list) else 0
     print(
         json.dumps(
             {
                 "path": str(args.out),
-                "source": payload["source"],
-                "records": len(payload["records"]),
+                "source": payload.get("source"),
+                "records": records_count,
                 "rich": bool(args.rich),
             },
             indent=2,

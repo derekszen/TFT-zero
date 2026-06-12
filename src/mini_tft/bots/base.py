@@ -23,6 +23,7 @@ class BaseBot(Protocol):
         rng: np.random.Generator,
     ) -> int:
         """Choose one legal action."""
+        ...
 
 
 @dataclass

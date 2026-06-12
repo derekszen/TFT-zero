@@ -261,12 +261,11 @@ def _make_candidate(
     for owned_index, board_index in assignments:
         board[board_index] = owned[owned_index].unit.clone()
 
-    bench_units = [
+    bench: list[UnitInstance | None] = [
         owned[index].unit.clone()
         for index in range(len(owned))
         if index not in selected
     ]
-    bench: list[UnitInstance | None] = bench_units
     bench.extend([None] * (config.bench_size - len(bench)))
     strength = board_strength(board, data).strength
     return CandidateBoard(board=tuple(board), bench=tuple(bench), strength=strength)

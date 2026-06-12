@@ -5,11 +5,12 @@ from __future__ import annotations
 import argparse
 import time
 from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 
 from mini_tft.rl.dataset import RolloutDataset, load_dataset
-from mini_tft.rl.train_ppo import make_env
+from mini_tft.rl.train_ppo import make_env, write_experiment_manifest
 
 
 def main() -> None:
@@ -99,7 +100,10 @@ def main() -> None:
 
                 loss_total += float(loss.item()) * len(batch_indices)
                 with torch.no_grad():
-                    distribution = model.policy.get_distribution(obs, action_masks=masks)
+                    distribution = cast(
+                        Any,
+                        model.policy.get_distribution(obs, action_masks=masks),
+                    )
                     logits = distribution.distribution.logits
                     predicted = logits.argmax(dim=1)
                     correct += int((predicted == actions).sum().item())
@@ -114,8 +118,21 @@ def main() -> None:
 
         args.out.parent.mkdir(parents=True, exist_ok=True)
         model.save(args.out)
+        manifest_path = write_experiment_manifest(
+            kind="bc_pretrain",
+            output=args.out,
+            args=args,
+            resolved={
+                "train_transitions": len(train_indices),
+                "validation_transitions": len(val_indices),
+                "ppo_batch_size": args.ppo_batch_size,
+                "policy_kwargs": {"net_arch": parse_hidden_sizes(args.hidden_sizes)},
+            },
+            elapsed_sec=time.perf_counter() - started,
+        )
         print()
         print(f"saved: `{args.out}.zip`")
+        print(f"manifest: `{manifest_path}`")
     finally:
         env.close()
 
@@ -135,7 +152,11 @@ def batches(indices: np.ndarray, batch_size: int) -> list[np.ndarray]:
     return [indices[start : start + batch_size] for start in range(0, len(indices), batch_size)]
 
 
-def batch_tensors(dataset: RolloutDataset, indices: np.ndarray, device: object):
+def batch_tensors(
+    dataset: RolloutDataset,
+    indices: np.ndarray,
+    device: Any,
+) -> tuple[Any, Any, Any]:
     import torch
 
     obs = torch.as_tensor(dataset.obs[indices], dtype=torch.float32, device=device)
@@ -145,7 +166,7 @@ def batch_tensors(dataset: RolloutDataset, indices: np.ndarray, device: object):
 
 
 def masked_argmax_accuracy(
-    model: object,
+    model: Any,
     dataset: RolloutDataset,
     indices: np.ndarray,
     batch_size: int,
@@ -160,7 +181,7 @@ def masked_argmax_accuracy(
     with torch.no_grad():
         for batch_indices in batches(indices, batch_size):
             obs, actions, masks = batch_tensors(dataset, batch_indices, model.policy.device)
-            distribution = model.policy.get_distribution(obs, action_masks=masks)
+            distribution = cast(Any, model.policy.get_distribution(obs, action_masks=masks))
             logits = distribution.distribution.logits
             predicted = logits.argmax(dim=1)
             correct += int((predicted == actions).sum().item())

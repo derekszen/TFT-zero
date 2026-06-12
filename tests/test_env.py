@@ -4,7 +4,9 @@ import numpy as np
 
 from mini_tft import EnvConfig, MiniTFTEnv
 from mini_tft.core.actions import NUM_ACTIONS, Action, move_bench_to_board_action
-from mini_tft.core.state import state_signature
+from mini_tft.core.combat import resolve_combat
+from mini_tft.core.set_data import load_set
+from mini_tft.core.state import UnitInstance, state_signature
 
 
 def test_env_reset_and_end_turn_step() -> None:
@@ -47,6 +49,50 @@ def test_same_seed_and_actions_are_deterministic() -> None:
     assert signatures[0] == signatures[1]
 
 
+def test_clone_restore_replays_stochastic_branch_exactly() -> None:
+    env = MiniTFTEnv(EnvConfig(seed=43, starting_gold=20))
+    env.reset(seed=43)
+    assert env.state is not None
+    snapshot = env.clone_state()
+    before = state_signature(env.state)
+
+    first_rollout = [env.step(Action.ROLL), env.step(Action.END_TURN)]
+    assert env.state is not None
+    first_signature = state_signature(env.state)
+
+    env.restore_state(snapshot)
+    assert env.state is not None
+    assert state_signature(env.state) == before
+
+    second_rollout = [env.step(Action.ROLL), env.step(Action.END_TURN)]
+
+    assert _transition_signatures(second_rollout) == _transition_signatures(first_rollout)
+    assert state_signature(env.state) == first_signature
+
+
+def test_clone_restore_does_not_alias_units_or_lists() -> None:
+    env = MiniTFTEnv(EnvConfig(seed=44))
+    env.reset(seed=44)
+    assert env.state is not None
+    env.state.bench[0] = UnitInstance(unit_id=1, items=[1])
+
+    snapshot = env.clone_state()
+    original_unit = env.state.bench[0]
+    assert original_unit is not None
+    original_unit.items.append(2)
+
+    env.restore_state(snapshot)
+    assert env.state is not None
+    assert env.state.bench[0] is not None
+    assert env.state.bench[0].items == [1]
+
+    restored_unit = env.state.bench[0]
+    assert restored_unit is not None
+    restored_unit.items.append(3)
+    assert snapshot.state.bench[0] is not None
+    assert snapshot.state.bench[0].items == [1]
+
+
 def test_episode_terminates_at_max_round() -> None:
     env = MiniTFTEnv(EnvConfig(seed=3, max_round=2))
     env.reset(seed=3)
@@ -85,6 +131,25 @@ def test_explicit_placement_action_moves_unit_from_bench_to_board() -> None:
     assert env.state.board[0].unit_id == unit_id
     assert env.state.bench[0] is None
     assert env.state.step_count == 2
+
+
+def _transition_signatures(transitions):
+    rows = []
+    for obs, reward, terminated, truncated, info in transitions:
+        rows.append(
+            (
+                tuple(obs.tolist()),
+                reward,
+                terminated,
+                truncated,
+                tuple(info["action_mask"].tolist()),
+                info["round"],
+                info["gold"],
+                info["hp"],
+                info["auto_end_turn"],
+            )
+        )
+    return rows
 
 
 def test_max_actions_per_round_auto_ends_turn() -> None:
@@ -143,6 +208,28 @@ def test_empty_board_always_loses_opening_combat() -> None:
 
     assert env.state.last_win is False
     assert env.state.hp < env.config.starting_hp
+
+
+def test_enemy_strength_multiplier_increases_combat_pressure() -> None:
+    data = load_set()
+    board = [None] * EnvConfig().max_level
+    baseline = resolve_combat(
+        board,
+        20,
+        data,
+        EnvConfig(enemy_strength_multiplier=1.0, combat_noise_std=0.0),
+        np.random.default_rng(1),
+    )
+    harder = resolve_combat(
+        board,
+        20,
+        data,
+        EnvConfig(enemy_strength_multiplier=1.12, combat_noise_std=0.0),
+        np.random.default_rng(1),
+    )
+
+    assert harder.enemy_strength > baseline.enemy_strength
+    assert harder.damage > baseline.damage
 
 
 def test_pve_rounds_drop_items_on_schedule() -> None:
