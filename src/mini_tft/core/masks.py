@@ -20,6 +20,11 @@ from mini_tft.core.items import first_combinable_recipe, is_completed_item
 from mini_tft.core.set_data import GameData
 from mini_tft.core.state import GameState
 
+ORACLE_MACRO_ACTIONS: tuple[Action, ...] = (
+    Action.FIELD_BEST_BOARD,
+    Action.SLAM_BEST_ITEM,
+)
+
 
 def legal_action_mask(
     state: GameState,
@@ -76,3 +81,12 @@ def legal_action_mask(
         for bench_index in range(len(state.bench)):
             mask[move_board_to_bench_action(board_index, bench_index)] = True
     return mask
+
+
+def mask_without_oracle_macro_actions(mask: NDArray[np.bool_]) -> NDArray[np.bool_]:
+    """Return a copy with oracle-like macro actions disabled."""
+
+    filtered = mask.copy()
+    for action in ORACLE_MACRO_ACTIONS:
+        filtered[action] = False
+    return filtered

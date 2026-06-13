@@ -82,12 +82,14 @@ def test_make_env_supports_lobby_training_wrapper() -> None:
         lobby_opponent_policy="tempo",
         players=4,
         max_actions_per_player=4,
+        allow_oracle_macro_actions=False,
     )()
     try:
         obs, _info = env.reset(seed=123)
         assert obs.ndim == 1
         assert env.action_space.n > 0
         assert env.action_masks().shape == (env.action_space.n,)
+        assert not env.allow_oracle_macro_actions
     finally:
         env.close()
 

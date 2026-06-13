@@ -36,6 +36,7 @@ from mini_tft.core.lobby_step import (
     step_lobby_round_with_policies,
     tempo_lobby_policy,
 )
+from mini_tft.core.masks import mask_without_oracle_macro_actions
 from mini_tft.core.set_data import GameData, load_set
 
 type AgentId = str
@@ -415,12 +416,14 @@ class MiniTFTLobbyHeroEnv(gym.Env[NDArray[np.float32], int]):
         player_count: int = DEFAULT_LOBBY_PLAYERS,
         opponent_policy: LobbyPolicy = tempo_lobby_policy,
         max_actions_per_player: int | None = None,
+        allow_oracle_macro_actions: bool = True,
     ) -> None:
         self.config = config or EnvConfig(seed=seed)
         self.data: GameData = load_set(self.config.dataset)
         self.player_count = player_count
         self.opponent_policy = opponent_policy
         self.max_actions_per_player = max_actions_per_player or self.config.max_actions_per_round
+        self.allow_oracle_macro_actions = allow_oracle_macro_actions
         self.rng = np.random.default_rng(self.config.seed if seed is None else seed)
         self.state: Set1LobbyState | None = None
         self.action_space = spaces.Discrete(NUM_ACTIONS)
@@ -496,7 +499,10 @@ class MiniTFTLobbyHeroEnv(gym.Env[NDArray[np.float32], int]):
 
     def action_masks(self) -> NDArray[np.bool_]:
         state = self._require_state()
-        return lobby_action_mask(state, 0, self.data, self.config)
+        mask = lobby_action_mask(state, 0, self.data, self.config)
+        if self.allow_oracle_macro_actions:
+            return mask
+        return mask_without_oracle_macro_actions(mask)
 
     def episode_summary(self) -> dict[str, int | float | str | None]:
         summary = lobby_player_summary(self._require_state(), 0, self.data)
@@ -562,6 +568,7 @@ class MiniTFTLobbyHeroEnv(gym.Env[NDArray[np.float32], int]):
             "placement": state.placements.get(0),
             "final_reason": state.players[0].final_reason or state.final_reason,
             "action_step_result": action_step,
+            "allow_oracle_macro_actions": self.allow_oracle_macro_actions,
         }
 
     def _require_state(self) -> Set1LobbyState:
