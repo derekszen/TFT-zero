@@ -25,6 +25,7 @@ def make_env(
     lobby_opponent_policy: str = "tempo",
     players: int = 8,
     max_actions_per_player: int | None = None,
+    allow_oracle_macro_actions: bool = True,
 ) -> Callable[[], gym.Env[Any, Any]]:
     def _factory() -> gym.Env[Any, Any]:
         config = EnvConfig(seed=seed)
@@ -36,6 +37,7 @@ def make_env(
                 player_count=players,
                 opponent_policy=_lobby_policy_by_name(lobby_opponent_policy),
                 max_actions_per_player=max_actions_per_player,
+                allow_oracle_macro_actions=allow_oracle_macro_actions,
             )
         raise ValueError(f"unsupported env kind: {env_kind}")
 
@@ -68,6 +70,11 @@ def main() -> None:
     parser.add_argument("--players", type=int, default=8)
     parser.add_argument("--max-actions-per-player", type=int, default=None)
     parser.add_argument(
+        "--disallow-oracle-macro-actions",
+        action="store_true",
+        help="For lobby PPO, remove field_best_board and slam_best_item from player-0 masks.",
+    )
+    parser.add_argument(
         "--hidden-sizes",
         default="64,64",
         help="Comma-separated MLP hidden sizes used for new policies.",
@@ -90,6 +97,7 @@ def main() -> None:
             lobby_opponent_policy=args.lobby_opponent_policy,
             players=args.players,
             max_actions_per_player=args.max_actions_per_player,
+            allow_oracle_macro_actions=not args.disallow_oracle_macro_actions,
         )
         for index in range(args.num_envs)
     ]
@@ -193,6 +201,7 @@ def resume_custom_objects(
 
 def print_resolved_config(args: argparse.Namespace, *, rollout_size: int, batch_size: int) -> None:
     mode = "new" if args.init is None else f"resume from {args.init}"
+    allow_oracle_macro_actions = not getattr(args, "disallow_oracle_macro_actions", False)
     print("# PPO Training")
     print(f"- mode: {mode}")
     print(f"- env_kind: {args.env_kind}")
@@ -200,6 +209,7 @@ def print_resolved_config(args: argparse.Namespace, *, rollout_size: int, batch_
         print(f"- lobby_opponent_policy: {args.lobby_opponent_policy}")
         print(f"- players: {args.players}")
         print(f"- max_actions_per_player: {args.max_actions_per_player}")
+        print(f"- allow_oracle_macro_actions: {allow_oracle_macro_actions}")
     print(f"- learning_rate: {args.learning_rate}")
     print(f"- n_steps: {args.n_steps}")
     print(f"- num_envs: {args.num_envs}")

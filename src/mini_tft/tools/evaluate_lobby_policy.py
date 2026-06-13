@@ -11,16 +11,19 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from mini_tft.core.actions import Action
 from mini_tft.core.config import EnvConfig
 from mini_tft.core.featurize import featurize_state
 from mini_tft.core.lobby import Set1LobbyState
 from mini_tft.core.lobby_step import (
+    LobbyActionRecord,
     LobbyPolicy,
     fast_level_lobby_policy,
     mixed_lobby_policy,
     random_lobby_policy,
     tempo_lobby_policy,
 )
+from mini_tft.core.masks import mask_without_oracle_macro_actions
 from mini_tft.core.set_data import GameData
 from mini_tft.rl.lobby_env import MiniTFTLobbyEnv
 
@@ -42,6 +45,8 @@ def run_lobby_evaluation(
     player_count: int = 8,
     max_actions_per_player: int | None = None,
     config: EnvConfig | None = None,
+    allow_hero_macro_actions: bool = True,
+    max_hero_macro_action_rate: float | None = None,
 ) -> dict[str, Any]:
     """Run seeded lobbies and summarize player-0 placement and HP metrics."""
 
@@ -49,6 +54,11 @@ def run_lobby_evaluation(
         raise ValueError("episodes must be positive")
     if player_count < 2:
         raise ValueError("player_count must be at least 2")
+    if (
+        max_hero_macro_action_rate is not None
+        and not 0.0 <= max_hero_macro_action_rate <= 1.0
+    ):
+        raise ValueError("max_hero_macro_action_rate must be between 0.0 and 1.0")
 
     base_config = config or EnvConfig(seed=seed)
     hero_policy = (
@@ -56,6 +66,8 @@ def run_lobby_evaluation(
         if checkpoint is not None
         else _named_policy(hero_policy_name)
     )
+    if not allow_hero_macro_actions:
+        hero_policy = _macro_filtered_policy(hero_policy)
     opponent_policy = _named_policy(opponent_policy_name)
     mixed_policy = _mixed_policy(hero_policy, opponent_policy)
 
@@ -66,6 +78,11 @@ def run_lobby_evaluation(
     total_actions = 0
     total_fights = 0
     total_illegal_actions = 0
+    hero_actions = 0
+    total_field_best_board_actions = 0
+    total_slam_best_item_actions = 0
+    hero_field_best_board_actions = 0
+    hero_slam_best_item_actions = 0
 
     for episode_index in range(episodes):
         episode_seed = seed + episode_index
@@ -87,6 +104,25 @@ def run_lobby_evaluation(
                 total_actions += int(action_step.action_count)
                 total_fights += int(action_step.resolved_fights)
                 total_illegal_actions += int(action_step.illegal_actions)
+                hero_actions += _count_actions(action_step.actions, player_id=0)
+                total_field_best_board_actions += _count_actions(
+                    action_step.actions,
+                    action=int(Action.FIELD_BEST_BOARD),
+                )
+                total_slam_best_item_actions += _count_actions(
+                    action_step.actions,
+                    action=int(Action.SLAM_BEST_ITEM),
+                )
+                hero_field_best_board_actions += _count_actions(
+                    action_step.actions,
+                    action=int(Action.FIELD_BEST_BOARD),
+                    player_id=0,
+                )
+                hero_slam_best_item_actions += _count_actions(
+                    action_step.actions,
+                    action=int(Action.SLAM_BEST_ITEM),
+                    player_id=0,
+                )
 
         state = env.state
         if state is None:
@@ -115,14 +151,27 @@ def run_lobby_evaluation(
         str(placement): int(np.sum(placements == placement))
         for placement in range(1, player_count + 1)
     }
+    total_macro_actions = total_field_best_board_actions + total_slam_best_item_actions
+    hero_macro_actions = hero_field_best_board_actions + hero_slam_best_item_actions
+    hero_macro_action_rate = _rate(hero_macro_actions, hero_actions)
+    status = (
+        "fail"
+        if (
+            max_hero_macro_action_rate is not None
+            and hero_macro_action_rate > max_hero_macro_action_rate
+        )
+        else "pass"
+    )
 
     return {
-        "status": "pass",
+        "status": status,
         "episodes": episodes,
         "seed": seed,
         "player_count": player_count,
         "hero_policy": str(checkpoint) if checkpoint is not None else hero_policy_name,
         "opponent_policy": opponent_policy_name,
+        "allow_hero_macro_actions": allow_hero_macro_actions,
+        "max_hero_macro_action_rate": max_hero_macro_action_rate,
         "mean_placement": float(np.mean(placements)),
         "median_placement": float(np.median(placements)),
         "top1_rate": float(np.mean(placements == 1)),
@@ -136,6 +185,14 @@ def run_lobby_evaluation(
         "total_actions": total_actions,
         "total_fights": total_fights,
         "total_illegal_actions": total_illegal_actions,
+        "hero_actions": hero_actions,
+        "total_macro_actions": total_macro_actions,
+        "total_field_best_board_actions": total_field_best_board_actions,
+        "total_slam_best_item_actions": total_slam_best_item_actions,
+        "hero_macro_actions": hero_macro_actions,
+        "hero_field_best_board_actions": hero_field_best_board_actions,
+        "hero_slam_best_item_actions": hero_slam_best_item_actions,
+        "hero_macro_action_rate": hero_macro_action_rate,
         "placement_histogram": placement_histogram,
     }
 
@@ -162,6 +219,15 @@ def format_markdown(report: dict[str, Any]) -> str:
         f"| Mean final board strength | {report['mean_final_board_strength']:.3f} |",
         f"| Mean lobby rounds | {report['mean_lobby_rounds']:.3f} |",
         f"| Total actions | {report['total_actions']} |",
+        f"| Hero actions | {report['hero_actions']} |",
+        f"| Hero macro actions allowed | {report['allow_hero_macro_actions']} |",
+        f"| Total macro actions | {report['total_macro_actions']} |",
+        f"| Total field_best_board actions | {report['total_field_best_board_actions']} |",
+        f"| Total slam_best_item actions | {report['total_slam_best_item_actions']} |",
+        f"| Hero macro actions | {report['hero_macro_actions']} |",
+        f"| Hero field_best_board actions | {report['hero_field_best_board_actions']} |",
+        f"| Hero slam_best_item actions | {report['hero_slam_best_item_actions']} |",
+        f"| Hero macro action rate | {report['hero_macro_action_rate']:.3f} |",
         f"| Total fights | {report['total_fights']} |",
         f"| Illegal actions | {report['total_illegal_actions']} |",
         "",
@@ -199,6 +265,27 @@ def _mixed_policy(hero_policy: LobbyPolicy, opponent_policy: LobbyPolicy) -> Lob
     return policy
 
 
+def _macro_filtered_policy(policy: LobbyPolicy) -> LobbyPolicy:
+    def filtered_policy(
+        player_id: int,
+        state: Set1LobbyState,
+        mask: NDArray[np.bool_],
+        data: GameData,
+        config: EnvConfig,
+        rng: np.random.Generator,
+    ) -> int:
+        return policy(
+            player_id,
+            state,
+            mask_without_oracle_macro_actions(mask),
+            data,
+            config,
+            rng,
+        )
+
+    return filtered_policy
+
+
 def _checkpoint_policy(checkpoint: Path) -> LobbyPolicy:
     try:
         from sb3_contrib import MaskablePPO
@@ -226,6 +313,26 @@ def _checkpoint_policy(checkpoint: Path) -> LobbyPolicy:
     return policy
 
 
+def _count_actions(
+    actions: Iterable[LobbyActionRecord],
+    *,
+    action: int | None = None,
+    player_id: int | None = None,
+) -> int:
+    return sum(
+        1
+        for record in actions
+        if (action is None or record.action == action)
+        and (player_id is None or record.player_id == player_id)
+    )
+
+
+def _rate(numerator: int, denominator: int) -> float:
+    if denominator <= 0:
+        return 0.0
+    return float(numerator / denominator)
+
+
 def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--episodes", type=int, default=100)
@@ -235,6 +342,17 @@ def main(argv: Iterable[str] | None = None) -> int:
     parser.add_argument("--checkpoint", type=Path, default=None)
     parser.add_argument("--players", type=int, default=8)
     parser.add_argument("--max-actions-per-player", type=int, default=None)
+    parser.add_argument(
+        "--disallow-hero-macro-actions",
+        action="store_true",
+        help="Remove field_best_board and slam_best_item from the evaluated hero policy mask.",
+    )
+    parser.add_argument(
+        "--max-hero-macro-action-rate",
+        type=float,
+        default=None,
+        help="Fail the report when player-0 selected macro action rate exceeds this value.",
+    )
     parser.add_argument("--format", choices=["markdown", "json"], default="markdown")
     parser.add_argument("--strict", action="store_true")
     args = parser.parse_args(list(argv) if argv is not None else None)
@@ -247,6 +365,8 @@ def main(argv: Iterable[str] | None = None) -> int:
         checkpoint=args.checkpoint,
         player_count=args.players,
         max_actions_per_player=args.max_actions_per_player,
+        allow_hero_macro_actions=not args.disallow_hero_macro_actions,
+        max_hero_macro_action_rate=args.max_hero_macro_action_rate,
     )
     if args.format == "json":
         print(json.dumps(report, indent=2, sort_keys=True))

@@ -15,6 +15,7 @@ from mini_tft.core.lobby_step import (
     tempo_lobby_policy,
 )
 from mini_tft.core.set_data import load_set
+from mini_tft.core.state import UnitInstance
 from mini_tft.rl.lobby_env import MiniTFTLobbyEnv, MiniTFTLobbyHeroEnv, MiniTFTLobbySnapshot
 from mini_tft.tools.evaluate_lobby_policy import run_lobby_evaluation
 from mini_tft.tools.set1_lobby_step_smoke import run_lobby_step_smoke
@@ -186,6 +187,33 @@ def test_lobby_hero_env_steps_player_zero_against_scripted_opponents() -> None:
     assert info["round"] >= 1
 
 
+def test_lobby_hero_env_can_mask_oracle_macro_actions() -> None:
+    config = EnvConfig(seed=0)
+    env = MiniTFTLobbyHeroEnv(
+        seed=0,
+        config=config,
+        player_count=4,
+        opponent_policy=tempo_lobby_policy,
+        allow_oracle_macro_actions=False,
+    )
+    _obs, _info = env.reset(seed=123)
+    assert env.state is not None
+    player = env.state.players[0]
+    weak_unit_id = min(env.data.units, key=lambda unit_id: env.data.units[unit_id].base_power)
+    strong_unit_id = max(env.data.units, key=lambda unit_id: env.data.units[unit_id].base_power)
+    player.board[0] = UnitInstance(unit_id=weak_unit_id)
+    player.bench[0] = UnitInstance(unit_id=strong_unit_id)
+    player.item_bench.append(env.data.completed_item_ids[0])
+
+    raw_mask = lobby_legal_action_mask(env.state, 0, env.data, config)
+    filtered_mask = env.action_masks()
+
+    assert raw_mask[Action.FIELD_BEST_BOARD]
+    assert raw_mask[Action.SLAM_BEST_ITEM]
+    assert not filtered_mask[Action.FIELD_BEST_BOARD]
+    assert not filtered_mask[Action.SLAM_BEST_ITEM]
+
+
 def test_player_order_modes_cover_fixed_random_and_rotating() -> None:
     config = EnvConfig(seed=0)
     data = load_set()
@@ -220,6 +248,47 @@ def test_lobby_policy_evaluation_reports_placement_hp_and_top_rates() -> None:
     assert 0.0 <= report["top4_rate"] <= 1.0
     assert report["mean_final_hp"] >= 0.0
     assert sum(report["placement_histogram"].values()) == 2
+    assert report["hero_actions"] > 0
+    assert report["total_macro_actions"] == (
+        report["total_field_best_board_actions"] + report["total_slam_best_item_actions"]
+    )
+    assert report["hero_macro_actions"] == (
+        report["hero_field_best_board_actions"] + report["hero_slam_best_item_actions"]
+    )
+    assert 0.0 <= report["hero_macro_action_rate"] <= 1.0
+
+
+def test_lobby_policy_evaluation_can_disallow_and_gate_hero_macro_actions() -> None:
+    config = EnvConfig(seed=7, starting_gold=10, max_actions_per_round=4, max_round=4)
+    gated_report = run_lobby_evaluation(
+        episodes=1,
+        seed=7,
+        hero_policy_name="fast_level",
+        opponent_policy_name="tempo",
+        player_count=4,
+        max_actions_per_player=4,
+        config=config,
+        allow_hero_macro_actions=True,
+        max_hero_macro_action_rate=0.0,
+    )
+    disallowed_report = run_lobby_evaluation(
+        episodes=1,
+        seed=7,
+        hero_policy_name="fast_level",
+        opponent_policy_name="tempo",
+        player_count=4,
+        max_actions_per_player=4,
+        config=config,
+        allow_hero_macro_actions=False,
+        max_hero_macro_action_rate=0.0,
+    )
+
+    assert gated_report["hero_macro_actions"] > 0
+    assert gated_report["status"] == "fail"
+    assert disallowed_report["allow_hero_macro_actions"] is False
+    assert disallowed_report["hero_macro_actions"] == 0
+    assert disallowed_report["hero_macro_action_rate"] == 0.0
+    assert disallowed_report["status"] == "pass"
 
 
 def test_lobby_step_smoke_report_has_throughput_and_hp() -> None:
