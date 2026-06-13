@@ -3,8 +3,9 @@ from __future__ import annotations
 import numpy as np
 
 from mini_tft.core.actions import BUY_SHOP_OFFSET, NUM_ACTIONS, Action
+from mini_tft.core.combat import base_damage_by_round
 from mini_tft.core.config import EnvConfig
-from mini_tft.core.lobby import lobby_signature, new_lobby_state
+from mini_tft.core.lobby import lobby_signature, new_lobby_state, resolve_lobby_round
 from mini_tft.core.lobby_step import (
     apply_lobby_action,
     fast_level_lobby_policy,
@@ -15,6 +16,7 @@ from mini_tft.core.lobby_step import (
     tempo_lobby_policy,
 )
 from mini_tft.core.set_data import load_set
+from mini_tft.core.state import UnitInstance
 from mini_tft.rl.lobby_env import MiniTFTLobbyEnv, MiniTFTLobbyHeroEnv, MiniTFTLobbySnapshot
 from mini_tft.tools.evaluate_lobby_policy import run_lobby_evaluation
 from mini_tft.tools.set1_lobby_step_smoke import run_lobby_step_smoke
@@ -106,6 +108,38 @@ def test_step_all_players_is_deterministic_for_same_seed_and_policy() -> None:
     )
 
     assert lobby_signature(lobby_a) == lobby_signature(lobby_b)
+
+
+def test_lobby_upset_damage_uses_winner_margin_not_absolute_gap() -> None:
+    config = EnvConfig(seed=0, combat_sigmoid_scale=1_000_000.0)
+    data = load_set()
+    lobby = new_lobby_state(config, data, seed=52, player_count=2)
+    lobby.players[0].board = [UnitInstance(1), *([None] * 8)]
+    lobby.players[1].board = [
+        UnitInstance(20, stars=2),
+        UnitInstance(21, stars=2),
+        None,
+        None,
+        None,
+        None,
+        UnitInstance(18, stars=2, items=[1, 2]),
+        None,
+        None,
+    ]
+
+    results = resolve_lobby_round(
+        lobby,
+        data,
+        config,
+        np.random.default_rng(2),
+        matchups=[(0, 1)],
+    )
+
+    result = results[0]
+    assert result.strength_a < result.strength_b
+    assert result.winner == 0
+    assert result.damage == base_damage_by_round(result.round)
+    assert lobby.players[1].hp == config.starting_hp - result.damage
 
 
 def test_mixed_lobby_policy_is_deterministic_for_same_seed() -> None:

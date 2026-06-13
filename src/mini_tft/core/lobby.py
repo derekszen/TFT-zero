@@ -10,7 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from mini_tft.core.actions import BUY_SHOP_OFFSET
-from mini_tft.core.combat import base_damage_by_round, board_strength
+from mini_tft.core.combat import board_strength, damage_from_winning_margin
 from mini_tft.core.config import EnvConfig
 from mini_tft.core.economy import income_after_combat, sell_value
 from mini_tft.core.ids import EMPTY
@@ -328,7 +328,9 @@ def _resolve_pair(
     a_won = bool(rng.random() < p_a_win)
     winner = player_a if a_won else player_b
     loser = player_b if a_won else player_a
-    damage = base_damage_by_round(state.round) + int(abs(diff) / 20.0)
+    winner_strength = strength_a if a_won else strength_b
+    loser_strength = strength_b if a_won else strength_a
+    damage = damage_from_winning_margin(state.round, winner_strength, loser_strength)
 
     loser_state = state.players[loser]
     loser_state.hp = max(0, loser_state.hp - damage)
