@@ -145,7 +145,7 @@ def resolve_combat(
     enemy_strength = max(0.0, enemy_strength - stats.enemy_power_penalty)
     has_board_units = any(unit is not None for unit in board)
     if not has_board_units and enemy_strength > 0.0:
-        damage = base_damage_by_round(round_num) + int(enemy_strength / 20)
+        damage = damage_from_winning_margin(round_num, enemy_strength, stats.strength)
         return CombatResult(
             won=False,
             damage=damage,
@@ -158,8 +158,7 @@ def resolve_combat(
     won = bool(rng.random() < p_win)
     damage = 0
     if not won:
-        margin_damage = int(max(0.0, enemy_strength - stats.strength) / 20)
-        damage = base_damage_by_round(round_num) + margin_damage
+        damage = damage_from_winning_margin(round_num, enemy_strength, stats.strength)
     return CombatResult(
         won=won,
         damage=damage,
@@ -184,6 +183,15 @@ def base_damage_by_round(round_num: int) -> int:
     if round_num < 32:
         return 8
     return 10
+
+
+def damage_from_winning_margin(
+    round_num: int,
+    winner_strength: float,
+    loser_strength: float,
+) -> int:
+    margin_damage = int(max(0.0, winner_strength - loser_strength) / 20.0)
+    return base_damage_by_round(round_num) + margin_damage
 
 
 def _board_balance_bonus(role_power: dict[str, float]) -> float:
