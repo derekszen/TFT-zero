@@ -16,6 +16,7 @@ runs/
 rollouts/
 checkpoints/
 artifacts/
+logs/
 experiments/autoresearch/runs/
 assets/cache/
 data/fight_labels/
