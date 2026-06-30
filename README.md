@@ -32,6 +32,7 @@ MetaTFT planner, or a completed MuZero system.
 | Scalar strategic throughput | `15,970` steps/sec | Claim-grade repo artifact |
 | Batched strategic throughput | `179,414` steps/sec | Claim-grade repo artifact |
 | PufferLib 4 Ocean-style standalone env | `~3.8M` steps/sec in commit smoke | Standalone C benchmark, not full trainer |
+| PufferLib 4 GPU trainer smoke | `~11.5M` SPS over `262,144` agent steps | Trainer throughput smoke, not policy quality |
 | Compiled simulator-backed MCTS throughput | `~0.63M` simulations/sec in main smoke | Native C++ extension |
 | Compiled MCTS speedup vs Python MCTS | about `100x+` on current smoke, `243x-255x` historical matched artifact | Simulator-backed search |
 | MuZero-style cache rows | `128`, legal action rate `1.0` | Smoke artifact |
@@ -84,6 +85,14 @@ Puffer-compatible speed evidence:
 ```text
 artifacts/strategic_lane/puffer_speed/metrics.json
 artifacts/strategic_lane/puffer_speed/decision.md
+```
+
+PufferLib 4 GPU trainer smoke:
+
+```text
+artifacts/strategic_lane/puffer4_gpu_trainer_smoke_*/metrics.json
+artifacts/strategic_lane/puffer4_gpu_trainer_smoke_*/decision.md
+artifacts/strategic_lane/puffer4_gpu_trainer_smoke_*/final_report.md
 ```
 
 MuZero-style cache smoke:
@@ -155,6 +164,7 @@ src/mini_tft/rl/puffer_env.py
 src/mini_tft/rl/train_puffer_ppo.py
 src/mini_tft/tools/strategic_lane_gate.py
 src/mini_tft/tools/strategic_mcts_smoke.py
+src/mini_tft/tools/run_puffer4_gpu_trainer.py
 ```
 
 ## Reproduce Current Repo Evidence
@@ -218,17 +228,15 @@ src/mini_tft/tools/benchmark_puffer4_ocean.py
 To build inside a full PufferLib 4.0 checkout:
 
 ```bash
-git clone --branch 4.0 https://github.com/PufferAI/PufferLib.git ../TFT-zero-puffer4
-cd ../TFT-zero-puffer4
-mkdir -p ocean/strategic_tft
-cp ../TFT-zero/src/mini_tft/strategic/ocean/strategic_tft.* ocean/strategic_tft/
-cp ../TFT-zero/src/mini_tft/strategic/ocean/binding.c ocean/strategic_tft/
-cp ../TFT-zero/config/strategic_tft.ini config/strategic_tft.ini
-bash build.sh strategic_tft --local
+env -u UV_PYTHON uv run --all-extras python -m mini_tft.tools.run_puffer4_gpu_trainer \
+  --pufferlib-root ../TFT-zero-puffer4 \
+  --timesteps 262144
 ```
 
 Use the Python strategic simulator as the parity oracle before reporting any
-full PufferLib 4.0 trainer numbers.
+full PufferLib 4.0 trainer numbers. The GPU trainer wrapper records the exact
+PufferLib commit, build stdout/stderr, `nvidia-smi` before/during/after,
+checkpoint/log paths, `metrics.json`, `decision.md`, and `final_report.md`.
 
 ## Active Docs
 
@@ -246,6 +254,8 @@ full PufferLib 4.0 trainer numbers.
 - `placement_proxy` is an elimination-timing bucket, not real TFT placement.
 - Puffer-compatible speed is rollout-throughput evidence, not policy-quality
   evidence.
+- PufferLib 4 GPU trainer smoke is trainer-throughput evidence, not MuZero or
+  learned policy quality.
 - Compiled MCTS speed is simulator-backed search throughput, not MuZero.
 - MuZero claims require learned dynamics, model-backed search, legal masks,
   auditable cache rows, and deterministic baseline comparisons.

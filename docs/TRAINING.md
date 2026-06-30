@@ -76,6 +76,20 @@ Strategic throughput evidence:
 env -u UV_PYTHON uv run python -m mini_tft.tools.strategic_lane_gate
 ```
 
+PufferLib 4 GPU trainer smoke:
+
+```bash
+env -u UV_PYTHON uv run --all-extras python -m mini_tft.tools.run_puffer4_gpu_trainer \
+  --pufferlib-root ../TFT-zero-puffer4 \
+  --timesteps 262144
+```
+
+This builds/refreshes a PufferLib 4 checkout, installs the strategic Ocean C
+environment, builds the CUDA trainer backend, runs a bounded trainer smoke, and
+writes `metrics.json`, `decision.md`, `final_report.md`, checkpoint/log paths,
+and `nvidia-smi` before/during/after. Treat it as strategic trainer throughput
+evidence only.
+
 ## MuZero-Style Direction
 
 The next claim should be over the strategic action surface, not raw primitive

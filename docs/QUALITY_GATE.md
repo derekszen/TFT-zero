@@ -64,6 +64,15 @@ For Puffer claims, include a matched benchmark artifact with:
 - semantic parity result;
 - decision: `pass`, `fail`, or `inconclusive`.
 
+For PufferLib 4 GPU trainer smoke claims, include:
+
+- exact PufferLib checkout/ref and `strategic_tft` config;
+- build stdout/stderr from `bash build.sh strategic_tft`;
+- trainer command, return code, checkpoint path, and log path;
+- `nvidia-smi` before/during/after or equivalent GPU telemetry;
+- SPS/throughput and total agent steps from the trainer log;
+- decision: `smoke_only` unless repeated matched benchmark gates promote it.
+
 For MuZero-style cache claims, include:
 
 - strategic parity matrix status when using native C++ or Ocean C fast paths;
@@ -119,6 +128,8 @@ Next:
 
 - Do not promote smoke-only artifacts into quality claims.
 - Do not treat Puffer import/training success as speed evidence.
+- Do not treat a PufferLib 4 GPU trainer smoke as MuZero or policy-quality
+  evidence.
 - Do not treat MuZero cache creation as policy-quality evidence.
 - Do not compare policies on unmatched seeds or incompatible action surfaces.
 - Do not claim real lobby placement from `placement_proxy` buckets.
