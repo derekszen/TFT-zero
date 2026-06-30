@@ -102,8 +102,10 @@ Verifier output is fail-closed:
 - unavailable verifier: record the command, failure, and fallback decision.
 
 For external model verification, use the user-approved verifier for the task.
-Current preferred verifier for long loops is OpenCode Go plan mode with
-`opencode-go/deepseek-v4-pro`.
+Current preferred verifier for long loops is the reusable Antigravity judge
+packet in `docs/ANTIGRAVITY_JUDGE.md`, using Flash 3.5 with high thinking in
+read-only mode. If Antigravity is unavailable, record the missing verifier and
+keep the gate blocked unless the user explicitly approves a fallback.
 
 ## Done Means
 
