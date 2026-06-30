@@ -1,0 +1,875 @@
+{
+  "artifacts": [
+    "metrics.json",
+    "matrix.jsonl",
+    "decision.md"
+  ],
+  "backends": [
+    "python",
+    "native_cpp",
+    "ocean_c"
+  ],
+  "checks": [
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 1,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "reset_only",
+      "seed": 0,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 1,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "reset_only",
+      "seed": 0,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 1,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "reset_only",
+      "seed": 1,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 1,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "reset_only",
+      "seed": 1,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 1,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "reset_only",
+      "seed": 7,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 1,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "reset_only",
+      "seed": 7,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 1,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "reset_only",
+      "seed": 19,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 1,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "reset_only",
+      "seed": 19,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 4,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "economy_rounds",
+      "seed": 0,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 4,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "economy_rounds",
+      "seed": 0,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 4,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "economy_rounds",
+      "seed": 1,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 4,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "economy_rounds",
+      "seed": 1,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 4,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "economy_rounds",
+      "seed": 7,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 4,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "economy_rounds",
+      "seed": 7,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 4,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "economy_rounds",
+      "seed": 19,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 4,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "economy_rounds",
+      "seed": 19,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 8,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "roll_buy_field",
+      "seed": 0,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 8,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "roll_buy_field",
+      "seed": 0,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 8,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "roll_buy_field",
+      "seed": 1,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 8,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "roll_buy_field",
+      "seed": 1,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 8,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "roll_buy_field",
+      "seed": 7,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 8,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "roll_buy_field",
+      "seed": 7,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 8,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "roll_buy_field",
+      "seed": 19,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 8,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "roll_buy_field",
+      "seed": 19,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 7,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "level_tempo",
+      "seed": 0,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 7,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "level_tempo",
+      "seed": 0,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 7,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "level_tempo",
+      "seed": 1,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 7,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "level_tempo",
+      "seed": 1,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 7,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "level_tempo",
+      "seed": 7,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 7,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "level_tempo",
+      "seed": 7,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 7,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "level_tempo",
+      "seed": 19,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 7,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "level_tempo",
+      "seed": 19,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 4,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "illegal_actions",
+      "seed": 0,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 4,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "illegal_actions",
+      "seed": 0,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 4,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "illegal_actions",
+      "seed": 1,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 4,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "illegal_actions",
+      "seed": 1,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 4,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "illegal_actions",
+      "seed": 7,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 4,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "illegal_actions",
+      "seed": 7,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 4,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "illegal_actions",
+      "seed": 19,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 4,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "illegal_actions",
+      "seed": 19,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 11,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "terminal_pressure",
+      "seed": 0,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 11,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "terminal_pressure",
+      "seed": 0,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 11,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "terminal_pressure",
+      "seed": 1,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 11,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "terminal_pressure",
+      "seed": 1,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 11,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "terminal_pressure",
+      "seed": 7,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 11,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "terminal_pressure",
+      "seed": 7,
+      "status": "pass"
+    },
+    {
+      "backend": "native_cpp",
+      "compared_fields": [
+        "state_signature"
+      ],
+      "compared_rows": 11,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "terminal_pressure",
+      "seed": 19,
+      "status": "pass"
+    },
+    {
+      "backend": "ocean_c",
+      "compared_fields": [
+        "state",
+        "observation",
+        "legal_mask",
+        "reward",
+        "terminal",
+        "placement_proxy",
+        "scenario_score"
+      ],
+      "compared_rows": 11,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "scenario": "terminal_pressure",
+      "seed": 19,
+      "status": "pass"
+    }
+  ],
+  "known_limits": [
+    "native_cpp parity compares Python-compatible state signatures",
+    "ocean_c parity allows fp32-vs-fp64 tolerance for combat float fields",
+    "ocean_c parity compares no-reset trace rows, not Puffer's auto-reset worker loop",
+    "parity does not prove policy quality or MuZero learning quality"
+  ],
+  "oracle_backend": "python",
+  "scenarios": [
+    {
+      "actions": [],
+      "description": "reset, observation, and legal-mask parity",
+      "name": "reset_only"
+    },
+    {
+      "actions": [
+        0,
+        7,
+        0
+      ],
+      "description": "hold and greed end-round transitions",
+      "name": "economy_rounds"
+    },
+    {
+      "actions": [
+        5,
+        6,
+        0,
+        2,
+        3,
+        6,
+        0
+      ],
+      "description": "shop refresh, buying, upgrade targeting, and board fielding",
+      "name": "roll_buy_field"
+    },
+    {
+      "actions": [
+        1,
+        1,
+        1,
+        0,
+        1,
+        0
+      ],
+      "description": "XP buys, illegal affordability checks, and round advancement",
+      "name": "level_tempo"
+    },
+    {
+      "actions": [
+        999,
+        8,
+        0
+      ],
+      "description": "out-of-range and currently illegal legal-mask behavior",
+      "name": "illegal_actions"
+    },
+    {
+      "actions": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "description": "terminal death under the tuned hard enemy-pressure curve",
+      "name": "terminal_pressure"
+    }
+  ],
+  "schema": "strategic-parity-matrix/v1",
+  "seeds": [
+    0,
+    1,
+    7,
+    19
+  ],
+  "status": "pass",
+  "summary": {
+    "failed": 0,
+    "passed": 48,
+    "total_checks": 48
+  },
+  "tolerance": 0.0001
+}

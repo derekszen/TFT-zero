@@ -67,11 +67,17 @@ typedef struct {
     int fielded[STRATEGIC_MAX_LEVEL];
     int role_items[STRATEGIC_ROLE_COUNT];
     int role_item_slots[STRATEGIC_ROLE_COUNT];
+    int done;
+    int final_reason;
     int action_count;
     float last_board_strength;
     float last_enemy_strength;
     int last_damage;
     int last_win;
+    int total_rolls;
+    int total_xp_buys;
+    int total_units_bought;
+    int total_item_slams;
     int total_illegal_actions;
     int episode_steps;
     float episode_return;
@@ -271,6 +277,7 @@ static inline void strategic_write_obs_and_mask(StrategicTFT* env) {
 
     if (env->action_mask == NULL) return;
     memset(env->action_mask, 0, STRATEGIC_NUM_ACTIONS * sizeof(unsigned char));
+    if (env->done) return;
     env->action_mask[STRATEGIC_HOLD] = 1;
     env->action_mask[STRATEGIC_GREED_ECON] = 1;
     env->action_mask[STRATEGIC_LEVEL] = (env->gold >= 4 && env->level < 9);
@@ -336,11 +343,17 @@ static inline void c_reset(StrategicTFT* env) {
     env->gold = 3;
     env->level = 3;
     env->xp = 0;
+    env->done = 0;
+    env->final_reason = 0;
     env->action_count = 0;
     env->last_board_strength = 0.0f;
     env->last_enemy_strength = 0.0f;
     env->last_damage = 0;
     env->last_win = 0;
+    env->total_rolls = 0;
+    env->total_xp_buys = 0;
+    env->total_units_bought = 0;
+    env->total_item_slams = 0;
     env->total_illegal_actions = 0;
     env->episode_steps = 0;
     env->episode_return = 0.0f;
@@ -381,9 +394,13 @@ static inline float strategic_end_round(StrategicTFT* env, int greed, int* done,
     if (env->hp <= 0) {
         *done = 1;
         *final_max_round = 0;
+        env->done = 1;
+        env->final_reason = 1;
     } else if (env->round >= 36) {
         *done = 1;
         *final_max_round = 1;
+        env->done = 1;
+        env->final_reason = 2;
     } else {
         env->round += 1;
     }
@@ -408,11 +425,13 @@ static inline float strategic_apply_action(StrategicTFT* env, int action) {
             env->level += 1;
             leveled = 1;
         }
+        env->total_xp_buys += 1;
         return leveled ? 0.08f : 0.01f;
     }
     if (action == STRATEGIC_ROLL) {
         env->gold -= 2;
         strategic_refresh_shop(env);
+        env->total_rolls += 1;
         return 0.0f;
     }
     if (action == STRATEGIC_BUY_BEST_UPGRADE || action == STRATEGIC_BUY_BEST_SYNERGY
@@ -425,6 +444,7 @@ static inline float strategic_apply_action(StrategicTFT* env, int action) {
         env->gold -= UNIT_COST[unit_id];
         env->owned[unit_id] += 1;
         env->shop[shop_index] = 0;
+        env->total_units_bought += 1;
         return env->owned[unit_id] == 3 || env->owned[unit_id] == 9 ? 0.10f : 0.04f;
     }
     if (action == STRATEGIC_FIELD_STRONGEST) {
@@ -443,12 +463,13 @@ static inline float strategic_apply_action(StrategicTFT* env, int action) {
     if (role >= 0) {
         env->role_items[role] -= 1;
         env->role_item_slots[role] += 1;
+        env->total_item_slams += 1;
         return ROLE_ITEM_POWER[role] * 0.02f;
     }
     return 0.0f;
 }
 
-static inline void c_step(StrategicTFT* env) {
+static inline void strategic_step_impl(StrategicTFT* env, int auto_reset) {
     int action = (int)env->actions[0];
     int legal = action >= 0 && action < STRATEGIC_NUM_ACTIONS
         && (env->action_mask == NULL || env->action_mask[action]);
@@ -480,10 +501,22 @@ static inline void c_step(StrategicTFT* env) {
     if (done) {
         env->terminals[0] = 1.0f;
         strategic_add_log(env, final_max_round);
-        c_reset(env);
+        if (auto_reset) {
+            c_reset(env);
+        } else {
+            strategic_write_obs_and_mask(env);
+        }
         return;
     }
     strategic_write_obs_and_mask(env);
+}
+
+static inline void strategic_step_no_reset(StrategicTFT* env) {
+    strategic_step_impl(env, 0);
+}
+
+static inline void c_step(StrategicTFT* env) {
+    strategic_step_impl(env, 1);
 }
 
 static inline int strategic_heuristic_action(StrategicTFT* env) {
