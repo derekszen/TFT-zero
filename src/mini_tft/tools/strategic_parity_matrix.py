@@ -1,4 +1,4 @@
-"""Run fixed-seed parity checks across strategic simulator backends."""
+"""Run fixed-seed and fuzz parity checks across strategic simulator backends."""
 
 from __future__ import annotations
 
@@ -13,7 +13,9 @@ from typing import Any
 
 import numpy as np
 
+from mini_tft.strategic.adapters.baselines import tft_heuristic_policy
 from mini_tft.strategic.core import (
+    NUM_ACTIONS,
     StrategicAction,
     StrategicConfig,
     legal_action_mask,
@@ -36,6 +38,9 @@ class ParityScenario:
     name: str
     actions: tuple[int, ...]
     description: str
+    kind: str = "fixed"
+    policy: str | None = None
+    seed: int | None = None
 
 
 SCENARIOS: tuple[ParityScenario, ...] = (
@@ -90,6 +95,7 @@ SCENARIOS: tuple[ParityScenario, ...] = (
     ),
 )
 SCENARIO_BY_NAME = {scenario.name: scenario for scenario in SCENARIOS}
+FUZZ_POLICIES = ("random_legal", "random_mixed", "heuristic")
 
 
 @dataclass(frozen=True)
@@ -99,21 +105,36 @@ class StrategicParityMatrixConfig:
     scenarios: tuple[ParityScenario, ...] = SCENARIOS
     cc: str = "cc"
     tolerance: float = 1.0e-4
+    fuzz_episodes: int = 0
+    fuzz_max_steps: int = 80
+    fuzz_policies: tuple[str, ...] = FUZZ_POLICIES
+    fuzz_seed: int = 1729
 
 
 def run_strategic_parity_matrix(config: StrategicParityMatrixConfig) -> dict[str, Any]:
-    if not config.seeds:
+    if not config.seeds and config.scenarios:
         raise ValueError("at least one seed is required")
-    if not config.scenarios:
-        raise ValueError("at least one parity scenario is required")
+    if not config.scenarios and config.fuzz_episodes <= 0:
+        raise ValueError("at least one fixed or fuzz parity scenario is required")
+    if config.fuzz_episodes < 0:
+        raise ValueError("fuzz_episodes must be non-negative")
+    if config.fuzz_max_steps <= 0:
+        raise ValueError("fuzz_max_steps must be positive")
+    unknown_fuzz_policies = sorted(set(config.fuzz_policies) - set(FUZZ_POLICIES))
+    if unknown_fuzz_policies:
+        raise ValueError(f"unknown fuzz policies: {unknown_fuzz_policies}")
 
     config.out_dir.mkdir(parents=True, exist_ok=True)
     ocean_binary = _compile_ocean_trace_binary(config)
     results: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
+    fuzz_scenarios = _generate_fuzz_scenarios(config)
 
-    for scenario in config.scenarios:
-        for seed in config.seeds:
+    for scenario in (*config.scenarios, *fuzz_scenarios):
+        scenario_seeds = (scenario.seed,) if scenario.seed is not None else config.seeds
+        for seed in scenario_seeds:
+            if seed is None:
+                raise ValueError(f"scenario {scenario.name} has no seed")
             python_rows = _python_trace_rows(seed=seed, actions=scenario.actions)
             python_signatures = _python_trace_signatures(seed=seed, actions=scenario.actions)
 
@@ -173,13 +194,24 @@ def run_strategic_parity_matrix(config: StrategicParityMatrixConfig) -> dict[str
         "backends": ["python", "native_cpp", "ocean_c"],
         "oracle_backend": "python",
         "seeds": list(config.seeds),
+        "fuzz": {
+            "enabled": config.fuzz_episodes > 0,
+            "episodes_per_policy": config.fuzz_episodes,
+            "max_steps": config.fuzz_max_steps,
+            "policies": list(config.fuzz_policies),
+            "seed": config.fuzz_seed,
+            "cases": len(fuzz_scenarios),
+        },
         "scenarios": [
             {
                 "name": scenario.name,
+                "kind": scenario.kind,
+                "policy": scenario.policy,
+                "seed": scenario.seed,
                 "description": scenario.description,
                 "actions": list(scenario.actions),
             }
-            for scenario in config.scenarios
+            for scenario in (*config.scenarios, *fuzz_scenarios)
         ],
         "tolerance": config.tolerance,
         "checks": results,
@@ -193,6 +225,7 @@ def run_strategic_parity_matrix(config: StrategicParityMatrixConfig) -> dict[str
             "native_cpp parity compares Python-compatible state signatures",
             "ocean_c parity allows fp32-vs-fp64 tolerance for combat float fields",
             "ocean_c parity compares no-reset trace rows, not Puffer's auto-reset worker loop",
+            "fuzz parity is differential testing over generated traces, not exhaustive proof",
             "parity does not prove policy quality or MuZero learning quality",
         ],
     }
@@ -200,6 +233,92 @@ def run_strategic_parity_matrix(config: StrategicParityMatrixConfig) -> dict[str
     _write_jsonl(config.out_dir / "matrix.jsonl", results)
     (config.out_dir / "decision.md").write_text(_format_decision(report), encoding="utf-8")
     return report
+
+
+def _generate_fuzz_scenarios(config: StrategicParityMatrixConfig) -> tuple[ParityScenario, ...]:
+    if config.fuzz_episodes <= 0:
+        return tuple()
+    rng = np.random.default_rng(config.fuzz_seed)
+    scenarios: list[ParityScenario] = []
+    for policy in config.fuzz_policies:
+        for episode_index in range(config.fuzz_episodes):
+            seed = int(rng.integers(0, 2_000_000_000))
+            action_seed = int(rng.integers(0, 2_000_000_000))
+            actions = _generate_fuzz_actions(
+                seed=seed,
+                policy=policy,
+                max_steps=config.fuzz_max_steps,
+                action_seed=action_seed,
+            )
+            scenarios.append(
+                ParityScenario(
+                    name=f"fuzz_{policy}_{episode_index:04d}",
+                    actions=actions,
+                    description=(
+                        f"{policy} generated trace with seed={seed}, "
+                        f"action_seed={action_seed}, max_steps={config.fuzz_max_steps}"
+                    ),
+                    kind="fuzz",
+                    policy=policy,
+                    seed=seed,
+                )
+            )
+    return tuple(scenarios)
+
+
+def _generate_fuzz_actions(
+    *,
+    seed: int,
+    policy: str,
+    max_steps: int,
+    action_seed: int,
+) -> tuple[int, ...]:
+    config = StrategicConfig()
+    rng = np.random.default_rng(action_seed)
+    state = reset(seed=seed, config=config)
+    actions: list[int] = []
+    for step_index in range(max_steps):
+        if state.done:
+            break
+        mask = legal_action_mask(state, config)
+        action = _select_fuzz_action(
+            state=state,
+            mask=mask,
+            config=config,
+            policy=policy,
+            rng=rng,
+            step_index=step_index,
+        )
+        actions.append(action)
+        step(state, action, config)
+    return tuple(actions)
+
+
+def _select_fuzz_action(
+    *,
+    state: Any,
+    mask: np.ndarray,
+    config: StrategicConfig,
+    policy: str,
+    rng: np.random.Generator,
+    step_index: int,
+) -> int:
+    legal_actions = [int(action) for action in np.flatnonzero(mask)]
+    if policy == "heuristic":
+        return int(tft_heuristic_policy(state, mask, config))
+    if policy == "random_legal":
+        if not legal_actions:
+            return int(StrategicAction.HOLD)
+        return legal_actions[int(rng.integers(0, len(legal_actions)))]
+    if policy == "random_mixed":
+        if step_index % 5 == 2:
+            illegal_actions = [action for action in range(NUM_ACTIONS) if not bool(mask[action])]
+            illegal_actions.extend([NUM_ACTIONS, NUM_ACTIONS + 17, 999])
+            return illegal_actions[int(rng.integers(0, len(illegal_actions)))]
+        if not legal_actions:
+            return int(StrategicAction.HOLD)
+        return legal_actions[int(rng.integers(0, len(legal_actions)))]
+    raise ValueError(f"unknown fuzz policy: {policy}")
 
 
 def _python_trace_signatures(*, seed: int, actions: Sequence[int]) -> list[tuple[object, ...]]:
@@ -457,7 +576,10 @@ def _result_row(
     return {
         "backend": backend,
         "scenario": scenario.name,
+        "scenario_kind": scenario.kind,
+        "policy": scenario.policy,
         "seed": seed,
+        "actions": list(scenario.actions),
         "status": "pass" if not mismatches else "fail",
         "compared_rows": compared_rows,
         "compared_fields": compared_fields,
@@ -550,16 +672,19 @@ def _format_decision(report: dict[str, Any]) -> str:
         f"Oracle backend: `{report['oracle_backend']}`",
         f"Backends: {', '.join(report['backends'])}",
         f"Seeds: {', '.join(str(seed) for seed in report['seeds'])}",
+        f"Fuzz enabled: `{report['fuzz']['enabled']}`",
+        f"Fuzz cases: {report['fuzz']['cases']}",
         f"Total checks: {report['summary']['total_checks']}",
         f"Failed checks: {report['summary']['failed']}",
         "",
-        "| Backend | Scenario | Seed | Status | Rows | Mismatches |",
-        "| --- | --- | ---: | --- | ---: | ---: |",
+        "| Backend | Kind | Scenario | Seed | Status | Rows | Mismatches |",
+        "| --- | --- | --- | ---: | --- | ---: | ---: |",
     ]
     for row in report["checks"]:
         lines.append(
             "| "
             f"{row['backend']} | "
+            f"{row['scenario_kind']} | "
             f"{row['scenario']} | "
             f"{row['seed']} | "
             f"{row['status']} | "
@@ -578,6 +703,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, action="append")
     parser.add_argument("--scenario", choices=sorted(SCENARIO_BY_NAME), action="append")
     parser.add_argument("--cc", default="cc")
+    parser.add_argument("--fuzz-episodes", type=int, default=0)
+    parser.add_argument("--fuzz-max-steps", type=int, default=80)
+    parser.add_argument("--fuzz-policy", choices=FUZZ_POLICIES, action="append")
+    parser.add_argument("--fuzz-seed", type=int, default=1729)
     parser.add_argument("--strict", action="store_true")
     return parser
 
@@ -595,6 +724,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             seeds=tuple(args.seed) if args.seed else (0, 1, 7, 19),
             scenarios=scenarios,
             cc=args.cc,
+            fuzz_episodes=args.fuzz_episodes,
+            fuzz_max_steps=args.fuzz_max_steps,
+            fuzz_policies=tuple(args.fuzz_policy) if args.fuzz_policy else FUZZ_POLICIES,
+            fuzz_seed=args.fuzz_seed,
         )
     )
     print(json.dumps(report, indent=2, sort_keys=True))
