@@ -15,7 +15,7 @@ MuZero-style cache path, or playable demo is working.
 | Pressure | Is the round-based enemy curve sane? | Heuristic death rate is nonzero and most weak/basic runs do not coast to max round. |
 | Baseline | Is there a comparison point? | Random and at least one heuristic or previous artifact. |
 | Artifact | Can the result be audited later? | `metrics.json`, `decision.md`, `final_report.md`, and logs. |
-| Verifier | Did an independent read-only review accept it? | Verifier `ACCEPT`, or documented unavailable fallback. |
+| Verifier | Did an independent read-only review accept it? | Verifier `ACCEPT`, or documented unavailable fallback. Use `docs/ANTIGRAVITY_JUDGE.md` for reusable judge packets. |
 
 ## Required Commands
 
@@ -124,4 +124,5 @@ Next:
 - Do not claim real lobby placement from `placement_proxy` buckets.
 - Do not add multi-agent opponent state to the strategic lane without a new
   active runbook.
-- If verifier rejects, the gate fails until fixed or explicitly overridden.
+- If verifier rejects, or if `artifacts/judge/<name>/verdict.md` is missing or
+  malformed, the gate fails until fixed or explicitly overridden.
