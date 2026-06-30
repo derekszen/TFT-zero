@@ -9,7 +9,7 @@ from mini_tft.strategic.adapters.analytics import (
     episode_rows_lazy,
     summarize_episode_rows,
 )
-from mini_tft.strategic.adapters.baselines import tft_heuristic_policy
+from mini_tft.strategic.adapters.baselines import random_policy, tft_heuristic_policy
 from mini_tft.strategic.adapters.muzero_cache import cache_metrics, generate_cache
 from mini_tft.strategic.adapters.puffer import run_benchmark
 from mini_tft.strategic.adapters.puffer.vector_env import StrategicBatchEnv
@@ -27,8 +27,9 @@ from mini_tft.strategic.core import (
     state_signature,
     step,
 )
-from mini_tft.strategic.core.actions import ROLE_INDEX
-from mini_tft.strategic.core.rules import run_episode
+from mini_tft.strategic.core.actions import ROLE_INDEX, action_name
+from mini_tft.strategic.core.rules import run_episode, trace_episode
+from mini_tft.strategic.native import plan_batch, run_native_mcts_smoke, trace_signatures
 from mini_tft.tools.strategic_lane_gate import StrategicLaneGateConfig, run_gate
 
 
@@ -108,6 +109,61 @@ def test_strategic_batch_env_matches_scalar_transitions() -> None:
             break
 
 
+def test_native_trace_matches_scalar_state_signatures() -> None:
+    script = [
+        int(StrategicAction.BUY_HIGHEST_COST),
+        int(StrategicAction.FIELD_STRONGEST),
+        int(StrategicAction.HOLD),
+        int(StrategicAction.BUY_HIGHEST_COST),
+        int(StrategicAction.BUY_BEST_SYNERGY),
+        int(StrategicAction.FIELD_STRONGEST),
+        int(StrategicAction.HOLD),
+        int(StrategicAction.ROLL),
+        int(StrategicAction.BUY_BEST_UPGRADE),
+        int(StrategicAction.FIELD_STRONGEST),
+        int(StrategicAction.GREED_ECON),
+        int(StrategicAction.SLAM_CARRY_ITEM),
+        int(StrategicAction.SLAM_TANK_ITEM),
+        int(StrategicAction.SLAM_SUPPORT_ITEM),
+        int(StrategicAction.LEVEL),
+        int(StrategicAction.HOLD),
+    ]
+
+    for seed in (0, 7, 19):
+        assert trace_signatures(seed=seed, actions=script) == trace_episode(script, seed=seed)
+
+
+def test_native_mcts_smoke_api_returns_legal_decisions() -> None:
+    result = run_native_mcts_smoke(
+        episodes=2,
+        seed=23,
+        simulations=(2,),
+        max_depth=4,
+        rollout_steps=2,
+        prior_mode="heuristic",
+    )
+
+    decision_rows = result["decision_rows"]
+    assert decision_rows
+    for row in decision_rows:
+        assert row["legal"] is True
+        assert 0 <= row["action_id"] < NUM_ACTIONS
+        assert row["action"] == action_name(row["action_id"])
+        assert len(row["visit_policy"]) == NUM_ACTIONS
+        assert sum(row["action_visits"].values()) == 2
+
+    batch = plan_batch(
+        seeds=[23, 24],
+        simulations=2,
+        max_depth=4,
+        rollout_steps=2,
+        prior_mode="heuristic",
+    )
+    assert len(batch["selected_actions"]) == 2
+    assert len(batch["visit_policies"]) == 2
+    assert batch["simulations_per_sec"] > 0.0
+
+
 def test_role_item_slam_uses_role_slots_and_legal_mask() -> None:
     config = StrategicConfig()
     state = reset(seed=0, config=config)
@@ -157,6 +213,12 @@ def test_heuristic_baseline_can_die_under_tuned_enemy_pressure() -> None:
     assert weak_bucket_rate >= 0.75
     assert max(scenario_scores) <= 1.0
     assert min(scenario_scores) >= 0.0
+
+    random_placements = [
+        placement_proxy(run_episode(random_policy, seed=seed, config=config)[0], config)
+        for seed in range(64)
+    ]
+    assert max(random_placements) == 8
 
 
 def test_placement_proxy_uses_stage_elimination_buckets() -> None:

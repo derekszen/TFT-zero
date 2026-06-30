@@ -1,11 +1,11 @@
 # Strategic PufferLib 4 Ocean Benchmark
 
 Backend: `pufferlib_4_ocean_standalone`
-Steps/sec: `4070980.81`
+Steps/sec: `3784844.75`
 Envs: `512`
 Steps: `100000`
-Episodes: `1537`
-Mean placement: `6.763`
+Episodes: `2560`
+Mean placement: `7.000`
 
 ## Puffer 4 Build
 

@@ -28,6 +28,7 @@ from mini_tft.strategic.core.rules import run_episode
 @dataclass(frozen=True)
 class StrategicMCTSSmokeConfig:
     out_dir: Path
+    backend: str = "python"
     episodes: int = 4
     seed: int = 0
     simulations: tuple[int, ...] = (8, 16)
@@ -41,50 +42,69 @@ def run_strategic_mcts_smoke(config: StrategicMCTSSmokeConfig) -> dict[str, Any]
         raise ValueError("episodes must be positive")
     if not config.simulations:
         raise ValueError("at least one simulation count is required")
+    if config.backend not in {"python", "native"}:
+        raise ValueError(f"unknown MCTS backend: {config.backend}")
     config.out_dir.mkdir(parents=True, exist_ok=True)
 
-    simulator_config = StrategicConfig()
-    episode_rows: list[dict[str, Any]] = []
-    decision_rows: list[dict[str, Any]] = []
     started = perf_counter()
+    if config.backend == "native":
+        from mini_tft.strategic.native import run_native_mcts_smoke
 
-    for name, policy in (("random", random_policy), ("heuristic", tft_heuristic_policy)):
-        for episode in range(config.episodes):
-            seed = config.seed + episode
-            state, total_reward, steps = run_episode(policy, seed=seed, config=simulator_config)
-            episode_rows.append(
-                _episode_row(
-                    policy=name,
+        native_result = run_native_mcts_smoke(
+            episodes=config.episodes,
+            seed=config.seed,
+            simulations=config.simulations,
+            max_depth=config.max_depth,
+            rollout_steps=config.rollout_steps,
+            prior_mode=config.prior_mode,
+        )
+        episode_rows = list(native_result["episode_rows"])
+        decision_rows = list(native_result["decision_rows"])
+    else:
+        simulator_config = StrategicConfig()
+        episode_rows = []
+        decision_rows = []
+
+        for name, policy in (("random", random_policy), ("heuristic", tft_heuristic_policy)):
+            for episode in range(config.episodes):
+                seed = config.seed + episode
+                state, total_reward, steps = run_episode(policy, seed=seed, config=simulator_config)
+                episode_rows.append(
+                    _episode_row(
+                        policy=name,
+                        episode=episode,
+                        seed=seed,
+                        total_reward=total_reward,
+                        steps=steps,
+                        state=state,
+                        config=simulator_config,
+                        decisions=0,
+                        elapsed_sec=0.0,
+                        simulations=0,
+                    )
+                )
+
+        for simulations in config.simulations:
+            policy_name = f"mcts_{simulations}"
+            for episode in range(config.episodes):
+                seed = config.seed + episode
+                row, decisions = _run_mcts_episode(
+                    policy_name=policy_name,
                     episode=episode,
                     seed=seed,
-                    total_reward=total_reward,
-                    steps=steps,
-                    state=state,
-                    config=simulator_config,
-                    decisions=0,
-                    elapsed_sec=0.0,
-                    simulations=0,
+                    simulations=simulations,
+                    config=config,
+                    simulator_config=simulator_config,
                 )
-            )
+                episode_rows.append(row)
+                decision_rows.extend(decisions)
 
-    for simulations in config.simulations:
-        policy_name = f"mcts_{simulations}"
-        for episode in range(config.episodes):
-            seed = config.seed + episode
-            row, decisions = _run_mcts_episode(
-                policy_name=policy_name,
-                episode=episode,
-                seed=seed,
-                simulations=simulations,
-                config=config,
-                simulator_config=simulator_config,
-            )
-            episode_rows.append(row)
-            decision_rows.extend(decisions)
+    elapsed_sec = perf_counter() - started
 
     policy_summaries = _summarize_policies(episode_rows, decision_rows)
     report = {
         "schema": "strategic-mcts-smoke/v1",
+        "backend": config.backend,
         "status": "smoke_only" if _illegal_action_count(episode_rows) == 0 else "fail",
         "seed": config.seed,
         "episodes_per_policy": config.episodes,
@@ -96,7 +116,7 @@ def run_strategic_mcts_smoke(config: StrategicMCTSSmokeConfig) -> dict[str, Any]
         },
         "policy_summaries": policy_summaries,
         "comparison": _comparison(policy_summaries),
-        "elapsed_sec": perf_counter() - started,
+        "elapsed_sec": elapsed_sec,
         "artifacts": ["metrics.json", "decision.md", "paper_table.md", "episodes.jsonl"],
         "known_limits": [
             "simulator-backed MCTS uses the real strategic simulator, not learned dynamics",
@@ -380,6 +400,7 @@ def _write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out-dir", type=Path, default=Path("artifacts/strategic_lane/mcts_smoke"))
+    parser.add_argument("--backend", choices=["python", "native"], default="python")
     parser.add_argument("--episodes", type=int, default=4)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--simulations", type=int, nargs="+", default=[8, 16])
@@ -395,6 +416,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     report = run_strategic_mcts_smoke(
         StrategicMCTSSmokeConfig(
             out_dir=args.out_dir,
+            backend=args.backend,
             episodes=args.episodes,
             seed=args.seed,
             simulations=tuple(args.simulations),

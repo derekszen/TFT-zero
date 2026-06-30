@@ -34,7 +34,7 @@ class StrategicConfig:
     max_role_item_slots: int = 3
     item_drop_interval: int = 4
     combat_sigmoid_scale: float = 14.0
-    enemy_strength_multiplier: float = 2.9
+    enemy_strength_multiplier: float = 5.0
     combat_noise: float = 2.0
     max_owned_copies: int = 27
 

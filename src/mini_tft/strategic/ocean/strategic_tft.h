@@ -115,7 +115,7 @@ static inline int strategic_xp_to_next_level(int level) {
 
 static inline float strategic_enemy_strength_for_round(int round_num) {
     float r = (float)(round_num > 1 ? round_num : 1);
-    return (13.0f + r * 3.2f + powf(r, 1.18f) * 1.35f) * 2.9f;
+    return (13.0f + r * 3.2f + powf(r, 1.18f) * 1.35f) * 5.0f;
 }
 
 static inline int strategic_placement_proxy(const StrategicTFT* env, int final_max_round) {

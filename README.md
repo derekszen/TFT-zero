@@ -31,21 +31,21 @@ MetaTFT planner, or a completed MuZero system.
 | Legacy Puffer-compatible vector rollout speedup | `11.23x` over scalar strategic stepping | Saved artifact from pre-4.0 wrapper path |
 | Scalar strategic throughput | `15,970` steps/sec | Claim-grade repo artifact |
 | Batched strategic throughput | `179,414` steps/sec | Claim-grade repo artifact |
-| PufferLib 4 Ocean-style standalone env | `~4.1M` steps/sec in commit smoke | Standalone C benchmark, not full trainer |
-| Compiled simulator-backed MCTS throughput | `565k-606k` simulations/sec | Isolated worktree artifact |
-| Compiled MCTS speedup vs Python MCTS | about `243x-255x` simulations/sec | Needs clean merge/promotion |
+| PufferLib 4 Ocean-style standalone env | `~3.8M` steps/sec in commit smoke | Standalone C benchmark, not full trainer |
+| Compiled simulator-backed MCTS throughput | `~0.63M` simulations/sec in main smoke | Native C++ extension |
+| Compiled MCTS speedup vs Python MCTS | about `100x+` on current smoke, `243x-255x` historical matched artifact | Simulator-backed search |
 | MuZero-style cache rows | `128`, legal action rate `1.0` | Smoke artifact |
 | Strategic action space | `11` legal-masked macro actions | Active scaffold |
-| Heuristic calibration | mean placement proxy `6.656`, death rate `1.0` | Claim-grade repo artifact |
+| Heuristic calibration | mean placement proxy `7.0`, death rate `1.0` | Harder enemy-pressure setting |
 | Python MCTS smoke | `mcts_32` improves reward/scenario score, not placement | Smoke artifact |
 | PPO strategic native smoke | `128` steps, one update | Wiring only |
 
-The strongest current systems result is the compiled planning worktree:
+The strongest current systems result is the compiled planning backend:
 
 ```text
-Python MCTS:  ~2.38k-2.44k simulations/sec
-Native MCTS:  ~0.56M-0.61M simulations/sec
-Speedup:      ~243x-255x
+Python MCTS smoke:   ~4.3k-4.6k simulations/sec
+Native MCTS smoke:   ~0.63M simulations/sec
+Historical matched:  ~243x-255x speedup
 ```
 
 The strongest saved rollout artifact from the legacy Puffer-compatible vector
@@ -118,11 +118,10 @@ artifacts/strategic_lane/mcts_smoke/episodes.jsonl
 artifacts/strategic_lane/mcts_smoke/decisions.jsonl
 ```
 
-Compiled simulator-backed MCTS artifacts currently live in the isolated
-worktree:
+Compiled simulator-backed MCTS artifacts:
 
 ```text
-/mnt/ssd2/Projects/TFT-zero-compiled-strategic-mcts/artifacts/strategic_lane/mcts_native_smoke/
+artifacts/strategic_lane/mcts_native_smoke/
 /mnt/ssd2/Projects/TFT-zero-compiled-strategic-mcts/artifacts/strategic_lane/mcts_native_benchmark/
 /mnt/ssd2/Projects/TFT-zero-compiled-strategic-mcts/artifacts/strategic_lane/mcts_python_matched_smoke/
 ```

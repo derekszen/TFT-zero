@@ -1,0 +1,133 @@
+{
+  "artifacts": [
+    "metrics.json",
+    "decision.md",
+    "paper_table.md",
+    "episodes.jsonl",
+    "decisions.jsonl"
+  ],
+  "backend": "native",
+  "comparison": {
+    "best_by_mean_placement": "heuristic",
+    "best_by_mean_reward": "mcts_16",
+    "best_by_mean_scenario_score": "heuristic"
+  },
+  "config": {
+    "max_depth": 8,
+    "prior_mode": "heuristic",
+    "rollout_steps": 4
+  },
+  "elapsed_sec": 0.013723280004342087,
+  "episodes_per_policy": 4,
+  "known_limits": [
+    "simulator-backed MCTS uses the real strategic simulator, not learned dynamics",
+    "placement_proxy is an elimination bucket, not real TFT placement",
+    "this is a smoke run unless episode counts and seed ranges are expanded"
+  ],
+  "policy_summaries": {
+    "heuristic": {
+      "death_rate": 1.0,
+      "decisions_per_sec": 0.0,
+      "elapsed_sec": 0.0,
+      "episodes": 4,
+      "illegal_action_count": 0,
+      "mean_final_round": 12.0,
+      "mean_hp": 0.0,
+      "mean_placement": 7.0,
+      "mean_reward": -2.128901404162537,
+      "mean_scenario_score": 0.218072775396224,
+      "placement_counts": {
+        "7": 4
+      },
+      "simulations": 0,
+      "simulations_per_sec": 0.0,
+      "survivor_rate": 0.0,
+      "total_decisions": 0
+    },
+    "mcts_16": {
+      "death_rate": 1.0,
+      "decisions_per_sec": 39990.827278778015,
+      "elapsed_sec": 0.00357582,
+      "episodes": 4,
+      "illegal_action_count": 0,
+      "mean_final_round": 12.0,
+      "mean_hp": 0.0,
+      "mean_placement": 7.0,
+      "mean_reward": -2.1191457429112677,
+      "mean_scenario_score": 0.218072775396224,
+      "placement_counts": {
+        "7": 4
+      },
+      "simulations": 16,
+      "simulations_per_sec": 639853.2364604482,
+      "survivor_rate": 0.0,
+      "total_decisions": 143
+    },
+    "mcts_32": {
+      "death_rate": 1.0,
+      "decisions_per_sec": 19897.211850271364,
+      "elapsed_sec": 0.0070864199999999995,
+      "episodes": 4,
+      "illegal_action_count": 0,
+      "mean_final_round": 12.0,
+      "mean_hp": 0.0,
+      "mean_placement": 7.0,
+      "mean_reward": -2.1516457429112674,
+      "mean_scenario_score": 0.218072775396224,
+      "placement_counts": {
+        "7": 4
+      },
+      "simulations": 32,
+      "simulations_per_sec": 636710.7792086836,
+      "survivor_rate": 0.0,
+      "total_decisions": 141
+    },
+    "mcts_8": {
+      "death_rate": 1.0,
+      "decisions_per_sec": 78393.53554845323,
+      "elapsed_sec": 0.00182413,
+      "episodes": 4,
+      "illegal_action_count": 0,
+      "mean_final_round": 12.0,
+      "mean_hp": 0.0,
+      "mean_placement": 7.0,
+      "mean_reward": -2.1191457429112677,
+      "mean_scenario_score": 0.218072775396224,
+      "placement_counts": {
+        "7": 4
+      },
+      "simulations": 8,
+      "simulations_per_sec": 627148.2843876259,
+      "survivor_rate": 0.0,
+      "total_decisions": 143
+    },
+    "random": {
+      "death_rate": 1.0,
+      "decisions_per_sec": 0.0,
+      "elapsed_sec": 0.0,
+      "episodes": 4,
+      "illegal_action_count": 0,
+      "mean_final_round": 10.75,
+      "mean_hp": 0.0,
+      "mean_placement": 7.25,
+      "mean_reward": -2.651408117198096,
+      "mean_scenario_score": 0.20181386623485809,
+      "placement_counts": {
+        "7": 3,
+        "8": 1
+      },
+      "simulations": 0,
+      "simulations_per_sec": 0.0,
+      "survivor_rate": 0.0,
+      "total_decisions": 0
+    }
+  },
+  "schema": "strategic-mcts-smoke/v1",
+  "seed": 0,
+  "simulations": [
+    8,
+    16,
+    32
+  ],
+  "status": "smoke_only"
+}

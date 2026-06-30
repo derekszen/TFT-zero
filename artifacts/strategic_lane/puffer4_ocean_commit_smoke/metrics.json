@@ -17,11 +17,11 @@
   "benchmark": {
     "envs": 512,
     "steps": 100000,
-    "elapsed_sec": 0.024564,
-    "steps_per_sec": 4070980.81,
-    "episodes": 1537,
-    "mean_placement": 6.763175,
-    "mean_score": 0.335236
+    "elapsed_sec": 0.026421,
+    "steps_per_sec": 3784844.75,
+    "episodes": 2560,
+    "mean_placement": 7.0,
+    "mean_score": 0.213926
   },
   "puffer_build": {
     "attempted": false
