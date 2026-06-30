@@ -1,0 +1,130 @@
+{
+  "schema": "quality-gate/v1",
+  "deliverable": "other",
+  "status": "smoke_only",
+  "seed": 0,
+  "commands": [
+    "python -m mini_tft.tools.strategic_lane_gate"
+  ],
+  "metrics": {
+    "puffer_speed": {
+      "benchmark_kind": "strategic_native_puffer_vector",
+      "semantic_parity": true,
+      "puffer_trainer": true,
+      "reference_steps_per_second": 15970.403511668637,
+      "batched_steps_per_second": 179413.90385379703,
+      "reference_steps_per_second_std": 143.93617225589782,
+      "batched_steps_per_second_std": 1952.5987035186579,
+      "speedup": 11.23414970214809,
+      "reference_steps": 18432,
+      "batched_steps": 18432,
+      "runs": 3,
+      "decision": "pass"
+    },
+    "muzero_cache": {
+      "rows": 128,
+      "observation_dim": 38,
+      "action_dim": 11,
+      "legal_action_rate": 1.0,
+      "mean_reward": 0.018397744963919035,
+      "mean_value_target": -0.286001372384762,
+      "terminal_rows": 2
+    },
+    "playable_demo": {
+      "round": 1,
+      "hp": 100,
+      "gold": 3,
+      "level": 3,
+      "legal_actions": 5,
+      "has_enemy_strength": true,
+      "has_placement_proxy": true,
+      "has_scenario_score": true,
+      "has_role_item_slots": true,
+      "stage_label": "Stage 1-1"
+    },
+    "calibration": {
+      "heuristic": {
+        "mean_placement": 6.65625,
+        "placement_counts": {
+          "6": 11,
+          "7": 21
+        },
+        "mean_scenario_score": 0.33875247876615733,
+        "min_placement": 6,
+        "max_placement": 7,
+        "mean_final_round": 17.28125,
+        "final_round_quantiles": {
+          "0.1": 17.0,
+          "0.25": 17.0,
+          "0.5": 17.0,
+          "0.75": 18.0,
+          "0.9": 18.0
+        },
+        "mean_hp": 0.0,
+        "min_hp": 0,
+        "max_hp": 0,
+        "final_reason_counts": {
+          "hp_zero": 32
+        },
+        "death_rate": 1.0,
+        "survivor_rate": 0.0,
+        "illegal_actions": 0,
+        "episodes": 32,
+        "last_episode_steps": 51
+      },
+      "random": {
+        "mean_placement": 7.0,
+        "placement_counts": {
+          "7": 32
+        },
+        "mean_scenario_score": 0.2785064474627419,
+        "min_placement": 7,
+        "max_placement": 7,
+        "mean_final_round": 15.03125,
+        "final_round_quantiles": {
+          "0.1": 13.0,
+          "0.25": 14.0,
+          "0.5": 15.0,
+          "0.75": 16.0,
+          "0.9": 16.0
+        },
+        "mean_hp": 0.0,
+        "min_hp": 0,
+        "max_hp": 0,
+        "final_reason_counts": {
+          "hp_zero": 32
+        },
+        "death_rate": 1.0,
+        "survivor_rate": 0.0,
+        "illegal_actions": 0,
+        "episodes": 32,
+        "last_episode_steps": 43
+      },
+      "heuristic_death_rate_target": true,
+      "enemy_model": "round_plus_rng_noise_pressure"
+    },
+    "elapsed_sec": 2.966
+  },
+  "artifacts": [
+    "puffer_speed/metrics.json",
+    "puffer_speed/decision.md",
+    "muzero_cache/rows.jsonl",
+    "muzero_cache/metrics.json",
+    "muzero_cache/decision.md",
+    "playable_demo/initial_payload.json",
+    "playable_demo/metrics.json",
+    "playable_demo/decision.md",
+    "metrics.json",
+    "decision.md",
+    "final_report.md",
+    "loop-state.json",
+    "loop-run-log.md"
+  ],
+  "known_limits": [
+    "strategic lane is a simplified TFT-shaped simulator, not a full TFT clone",
+    "MuZero cache artifact is smoke data; no dynamics/policy model is promoted here",
+    "playable demo artifact is a shared-rules payload, not a launched browser route",
+    "puffer speed artifact is native vector throughput evidence, not PPO quality evidence",
+    "placement_proxy is an elimination-timing bucket, not real lobby placement"
+  ]
+}

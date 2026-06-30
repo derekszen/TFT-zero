@@ -1,0 +1,39 @@
+{
+  "schema": "strategic-puffer4-ocean-benchmark/v1",
+  "backend": "pufferlib_4_ocean_standalone",
+  "source": "/mnt/ssd2/Projects/TFT-zero/src/mini_tft/strategic/ocean",
+  "compile_cmd": [
+    "cc",
+    "-O3",
+    "-std=c11",
+    "-D_POSIX_C_SOURCE=199309L",
+    "-I",
+    "/mnt/ssd2/Projects/TFT-zero/src/mini_tft/strategic/ocean",
+    "/mnt/ssd2/Projects/TFT-zero/src/mini_tft/strategic/ocean/strategic_tft.c",
+    "-lm",
+    "-o",
+    "artifacts/strategic_lane/puffer4_ocean_commit_smoke/strategic_tft_bench"
+  ],
+  "benchmark": {
+    "envs": 512,
+    "steps": 100000,
+    "elapsed_sec": 0.024564,
+    "steps_per_sec": 4070980.81,
+    "episodes": 1537,
+    "mean_placement": 6.763175,
+    "mean_score": 0.335236
+  },
+  "puffer_build": {
+    "attempted": false
+  },
+  "artifacts": [
+    "metrics.json",
+    "decision.md",
+    "strategic_tft_bench"
+  ],
+  "known_limits": [
+    "standalone benchmark exercises the Ocean C env loop, not the full Puffer trainer",
+    "the env mirrors strategic rules for throughput exploration; scalar parity is covered by Python/native tests",
+    "PufferLib 4.0 training requires building the env inside a PufferLib 4.0 source checkout"
+  ]
+}

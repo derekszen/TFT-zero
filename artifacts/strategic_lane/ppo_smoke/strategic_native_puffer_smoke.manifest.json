@@ -1,0 +1,225 @@
+{
+  "args": {
+    "batch_size": 64,
+    "clip_range": 0.2,
+    "device": "cpu",
+    "disallow_oracle_macro_actions": false,
+    "ent_coef": 0.01,
+    "env_kind": "strategic",
+    "gae_lambda": 0.95,
+    "gamma": 0.99,
+    "hidden_sizes": "16",
+    "learning_rate": 0.00025,
+    "lobby_opponent_policy": "tempo",
+    "max_actions_per_player": null,
+    "max_actions_per_round": 2,
+    "max_grad_norm": 0.5,
+    "max_round": 6,
+    "n_steps": 8,
+    "num_envs": 16,
+    "out": "artifacts/strategic_lane/ppo_smoke/strategic_native_puffer_smoke.pt",
+    "players": 8,
+    "puffer_backend": "native",
+    "seed": 2026,
+    "timesteps": 128,
+    "update_epochs": 1,
+    "vf_coef": 0.5
+  },
+  "created_at_unix": 1782822086.2865112,
+  "elapsed_sec": 0.4639221309989807,
+  "git": {
+    "branch": "mvp/current-metatft-value-model",
+    "commit": "709849c5a6d11cb69c589de4c716103b76f3997f",
+    "dirty": true,
+    "status_porcelain": "M .gitignore\n M README.md\n M docs/ARCHITECTURE.md\n D docs/AUTORESEARCH.md\n D docs/BRANCH_ARCHITECTURE.md\n D docs/CURRENT_PATCH_METATFT.md\n D docs/DATA_GENERATION.md\n D docs/FIGHT_VALUE_MODEL.md\n D docs/PROJECT_BRIEF.md\n D docs/SIMULATOR_ROADMAP.md\n M docs/TRAINING.md\n D docs/V0_BUILD_PLAN.md\n M pyproject.toml\n M src/mini_tft/rl/puffer_env.py\n M src/mini_tft/rl/train_ppo.py\n M src/mini_tft/tools/evaluate_frozen_lobby_pool.py\n M src/mini_tft/tools/evaluate_lobby_policy.py\n M tests/test_train_ppo.py\n M uv.lock\n?? AGENTS.md\n?? docs/ARCHIVE_INDEX.md\n?? docs/LOOP_SCAFFOLD.md\n?? docs/QUALITY_GATE.md\n?? docs/STRATEGIC_LANE.md\n?? docs/archive/\n?? loop-run-log.md\n?? src/mini_tft/rl/checkpoint_policy.py\n?? src/mini_tft/rl/train_puffer_ppo.py\n?? src/mini_tft/search/\n?? src/mini_tft/strategic/\n?? src/mini_tft/tools/benchmark_puffer_backends.py\n?? src/mini_tft/tools/compare_puffer_ppo.py\n?? src/mini_tft/tools/evaluate_strategic_policy.py\n?? src/mini_tft/tools/lobby_diagnostics.py\n?? src/mini_tft/tools/stage1_diagnostics.py\n?? src/mini_tft/tools/stage2_mcts.py\n?? src/mini_tft/tools/stage3_distill.py\n?? src/mini_tft/tools/stage4_ablation_matrix.py\n?? src/mini_tft/tools/stage4_dynamics.py\n?? src/mini_tft/tools/strategic_lane_gate.py\n?? tests/test_checkpoint_policy.py\n?? tests/test_compare_puffer_ppo.py\n?? tests/test_lobby_diagnostics.py\n?? tests/test_puffer_env.py\n?? tests/test_stage2_mcts.py\n?? tests/test_stage3_distill.py\n?? tests/test_stage4_dynamics.py\n?? tests/test_strategic_core.py\n?? tests/test_strategic_eval.py\n?? tests/test_strategic_scaffold.py\n?? tests/test_train_puffer_ppo.py"
+  },
+  "initial_reset_info_keys": [
+    [
+      "action_mask",
+      "ended_round",
+      "final_reason",
+      "gold",
+      "hp",
+      "legal_action",
+      "level",
+      "round"
+    ],
+    [
+      "action_mask",
+      "ended_round",
+      "final_reason",
+      "gold",
+      "hp",
+      "legal_action",
+      "level",
+      "round"
+    ],
+    [
+      "action_mask",
+      "ended_round",
+      "final_reason",
+      "gold",
+      "hp",
+      "legal_action",
+      "level",
+      "round"
+    ],
+    [
+      "action_mask",
+      "ended_round",
+      "final_reason",
+      "gold",
+      "hp",
+      "legal_action",
+      "level",
+      "round"
+    ],
+    [
+      "action_mask",
+      "ended_round",
+      "final_reason",
+      "gold",
+      "hp",
+      "legal_action",
+      "level",
+      "round"
+    ],
+    [
+      "action_mask",
+      "ended_round",
+      "final_reason",
+      "gold",
+      "hp",
+      "legal_action",
+      "level",
+      "round"
+    ],
+    [
+      "action_mask",
+      "ended_round",
+      "final_reason",
+      "gold",
+      "hp",
+      "legal_action",
+      "level",
+      "round"
+    ],
+    [
+      "action_mask",
+      "ended_round",
+      "final_reason",
+      "gold",
+      "hp",
+      "legal_action",
+      "level",
+      "round"
+    ],
+    [
+      "action_mask",
+      "ended_round",
+      "final_reason",
+      "gold",
+      "hp",
+      "legal_action",
+      "level",
+      "round"
+    ],
+    [
+      "action_mask",
+      "ended_round",
+      "final_reason",
+      "gold",
+      "hp",
+      "legal_action",
+      "level",
+      "round"
+    ],
+    [
+      "action_mask",
+      "ended_round",
+      "final_reason",
+      "gold",
+      "hp",
+      "legal_action",
+      "level",
+      "round"
+    ],
+    [
+      "action_mask",
+      "ended_round",
+      "final_reason",
+      "gold",
+      "hp",
+      "legal_action",
+      "level",
+      "round"
+    ],
+    [
+      "action_mask",
+      "ended_round",
+      "final_reason",
+      "gold",
+      "hp",
+      "legal_action",
+      "level",
+      "round"
+    ],
+    [
+      "action_mask",
+      "ended_round",
+      "final_reason",
+      "gold",
+      "hp",
+      "legal_action",
+      "level",
+      "round"
+    ],
+    [
+      "action_mask",
+      "ended_round",
+      "final_reason",
+      "gold",
+      "hp",
+      "legal_action",
+      "level",
+      "round"
+    ],
+    [
+      "action_mask",
+      "ended_round",
+      "final_reason",
+      "gold",
+      "hp",
+      "legal_action",
+      "level",
+      "round"
+    ]
+  ],
+  "kind": "puffer_ppo",
+  "model_path": "artifacts/strategic_lane/ppo_smoke/strategic_native_puffer_smoke.pt",
+  "packages": {
+    "gymnasium": "1.2.3",
+    "numpy": "2.4.6",
+    "pufferlib": "3.0.0",
+    "tft-zero": "0.1.0",
+    "torch": "2.12.0"
+  },
+  "resolved": {
+    "action_dim": 11,
+    "batch_size": 64,
+    "device": "cpu",
+    "hidden_sizes": [
+      16
+    ],
+    "observation_dim": 49,
+    "puffer_backend": "native",
+    "rollout_size": 128
+  },
+  "summary": {
+    "completed_episodes": 0,
+    "mean_episode_length": null,
+    "mean_episode_return": null,
+    "total_steps": 128,
+    "updates": 1
+  }
+}

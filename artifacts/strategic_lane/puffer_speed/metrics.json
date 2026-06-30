@@ -1,0 +1,30 @@
+{
+  "schema": "quality-gate/v1",
+  "deliverable": "puffer_speed",
+  "status": "pass",
+  "seed": 0,
+  "commands": [],
+  "metrics": {
+    "benchmark_kind": "strategic_native_puffer_vector",
+    "semantic_parity": true,
+    "puffer_trainer": true,
+    "reference_steps_per_second": 15970.403511668637,
+    "batched_steps_per_second": 179413.90385379703,
+    "reference_steps_per_second_std": 143.93617225589782,
+    "batched_steps_per_second_std": 1952.5987035186579,
+    "speedup": 11.23414970214809,
+    "reference_steps": 18432,
+    "batched_steps": 18432,
+    "runs": 3,
+    "decision": "pass"
+  },
+  "artifacts": [
+    "metrics.json",
+    "decision.md"
+  ],
+  "known_limits": [
+    "Puffer path uses native batched strategic vectorization",
+    "material pass threshold is 3x repeated matched scalar throughput",
+    "this is not full PPO quality evidence"
+  ]
+}

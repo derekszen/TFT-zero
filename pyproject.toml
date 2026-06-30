@@ -11,6 +11,7 @@ requires-python = ">=3.12"
 dependencies = [
   "gymnasium>=1.0.0",
   "numpy>=2.0.0",
+  "polars>=1.0.0",
   "pydantic>=2.8.0",
 ]
 
@@ -36,6 +37,17 @@ fight = [
   "tqdm>=4.66.0",
   "zarr>=3.2.1",
 ]
+puffer = [
+  "pufferlib",
+]
+
+[tool.uv]
+extra-build-variables = { pufferlib = { NO_TRAIN = "1" } }
+override-dependencies = ["numpy>=2.0.0"]
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
 
 [dependency-groups]
 dev = [
@@ -65,3 +77,6 @@ exclude = ["third_party", "**/__pycache__"]
 pythonVersion = "3.12"
 typeCheckingMode = "standard"
 reportMissingTypeStubs = false
+
+[tool.uv.sources]
+pufferlib = { git = "https://github.com/PufferAI/PufferLib.git", rev = "9a4eb87e6b58c0aa5f22affefb65c7006d384972" }

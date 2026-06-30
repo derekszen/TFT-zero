@@ -13,7 +13,6 @@ from numpy.typing import NDArray
 
 from mini_tft.core.actions import Action
 from mini_tft.core.config import EnvConfig
-from mini_tft.core.featurize import featurize_state
 from mini_tft.core.lobby import Set1LobbyState
 from mini_tft.core.lobby_step import (
     LobbyActionRecord,
@@ -25,6 +24,11 @@ from mini_tft.core.lobby_step import (
 )
 from mini_tft.core.masks import mask_without_oracle_macro_actions
 from mini_tft.core.set_data import GameData
+from mini_tft.rl.checkpoint_policy import (
+    CheckpointFormat,
+    load_lobby_checkpoint_policy,
+    resolve_checkpoint_format,
+)
 from mini_tft.rl.lobby_env import MiniTFTLobbyEnv
 
 POLICY_BY_NAME: dict[str, LobbyPolicy] = {
@@ -42,8 +46,10 @@ def run_lobby_evaluation(
     hero_policy_name: str = "fast_level",
     opponent_policy_name: str = "fast_level",
     checkpoint: Path | None = None,
+    checkpoint_format: CheckpointFormat = "auto",
     player_count: int = 8,
     max_actions_per_player: int | None = None,
+    device: str = "cpu",
     config: EnvConfig | None = None,
     allow_hero_macro_actions: bool = True,
     max_hero_macro_action_rate: float | None = None,
@@ -61,8 +67,17 @@ def run_lobby_evaluation(
         raise ValueError("max_hero_macro_action_rate must be between 0.0 and 1.0")
 
     base_config = config or EnvConfig(seed=seed)
+    resolved_checkpoint_format = (
+        resolve_checkpoint_format(checkpoint, checkpoint_format)
+        if checkpoint is not None
+        else None
+    )
     hero_policy = (
-        _checkpoint_policy(checkpoint)
+        load_lobby_checkpoint_policy(
+            checkpoint,
+            checkpoint_format=checkpoint_format,
+            device=device,
+        )
         if checkpoint is not None
         else _named_policy(hero_policy_name)
     )
@@ -169,6 +184,8 @@ def run_lobby_evaluation(
         "seed": seed,
         "player_count": player_count,
         "hero_policy": str(checkpoint) if checkpoint is not None else hero_policy_name,
+        "checkpoint_format": resolved_checkpoint_format,
+        "device": device,
         "opponent_policy": opponent_policy_name,
         "allow_hero_macro_actions": allow_hero_macro_actions,
         "max_hero_macro_action_rate": max_hero_macro_action_rate,
@@ -209,6 +226,7 @@ def format_markdown(report: dict[str, Any]) -> str:
         f"| Episodes | {report['episodes']} |",
         f"| Players | {report['player_count']} |",
         f"| Hero policy | `{report['hero_policy']}` |",
+        f"| Checkpoint format | `{report['checkpoint_format']}` |",
         f"| Opponent policy | `{report['opponent_policy']}` |",
         f"| Mean placement | {report['mean_placement']:.3f} |",
         f"| Median placement | {report['median_placement']:.3f} |",
@@ -286,33 +304,6 @@ def _macro_filtered_policy(policy: LobbyPolicy) -> LobbyPolicy:
     return filtered_policy
 
 
-def _checkpoint_policy(checkpoint: Path) -> LobbyPolicy:
-    try:
-        from sb3_contrib import MaskablePPO
-    except ImportError as exc:
-        raise SystemExit("Install training dependencies with `uv sync --extra train`.") from exc
-
-    model = MaskablePPO.load(checkpoint)
-
-    def policy(
-        player_id: int,
-        state: Set1LobbyState,
-        mask: NDArray[np.bool_],
-        data: GameData,
-        config: EnvConfig,
-        _rng: np.random.Generator,
-    ) -> int:
-        obs = featurize_state(state.players[player_id], data, config)
-        action, _ = model.predict(
-            obs,
-            deterministic=True,
-            action_masks=mask,
-        )
-        return int(action)
-
-    return policy
-
-
 def _count_actions(
     actions: Iterable[LobbyActionRecord],
     *,
@@ -340,6 +331,12 @@ def main(argv: Iterable[str] | None = None) -> int:
     parser.add_argument("--hero-policy", choices=sorted(POLICY_BY_NAME), default="fast_level")
     parser.add_argument("--opponent-policy", choices=sorted(POLICY_BY_NAME), default="fast_level")
     parser.add_argument("--checkpoint", type=Path, default=None)
+    parser.add_argument(
+        "--checkpoint-format",
+        choices=["auto", "sb3", "puffer"],
+        default="auto",
+    )
+    parser.add_argument("--device", default="cpu")
     parser.add_argument("--players", type=int, default=8)
     parser.add_argument("--max-actions-per-player", type=int, default=None)
     parser.add_argument(
@@ -363,8 +360,10 @@ def main(argv: Iterable[str] | None = None) -> int:
         hero_policy_name=args.hero_policy,
         opponent_policy_name=args.opponent_policy,
         checkpoint=args.checkpoint,
+        checkpoint_format=args.checkpoint_format,
         player_count=args.players,
         max_actions_per_player=args.max_actions_per_player,
+        device=args.device,
         allow_hero_macro_actions=not args.disallow_hero_macro_actions,
         max_hero_macro_action_rate=args.max_hero_macro_action_rate,
     )

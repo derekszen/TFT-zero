@@ -69,9 +69,33 @@ improving policy behavior.
 5. Keep the change only if the public phase passes and holdout does not regress.
 6. Record the reasoning in the run report or a follow-up note.
 
-## Next Step Toward MuZero
+## MuZero-Stage Loop
 
-The same harness should later gain a simulator-backed search objective. That
-objective should compare PPO-only action selection against MCTS-improved action
-selection on fixed lobby seeds, with placement/top-4/HP metrics and clone/restore
-determinism gates.
+The MuZero-stage work has its own gate contract in
+`docs/MUZERO_STAGE_GATE.md`. The current autonomous rerun contract is
+`docs/CANDIDATE_CHOICE_MUZERO_RUNBOOK.md`; use that document instead of the
+generic PPO objective runner for candidate-choice MuZero work.
+
+Current status:
+
+- Stage 1 diagnostics remain useful as narrow roll/mask/evaluator probes.
+- Goal 1 repaired outcome aggregation and Goal 2 reran the repaired Stage 4
+  matrix.
+- Legacy raw-action Stage 2-4/4-strong artifacts remain historical baselines, not
+  candidate-choice promotion evidence.
+
+Current rerun loop:
+
+1. Verify or smoke-train the candidate-choice PPO baseline.
+2. Migrate Stage 2 MCTS to non-oracle candidate-board choices.
+3. Rerun Stage 3/4 target generation, distillation, dynamics, and ablations on
+   the candidate-choice action dimension.
+4. Smoke-test Stage 5 replay/search-target scaffolding under the same surface.
+5. Run independent verifier checks before any promotion claim.
+
+Do not replace this rerun with another long PPO continuation.
+
+MuZero promotion claims must use `action_surface = candidate_choice`: candidate
+board choices plus economy/shop/end actions, with oracle macros disabled and
+primitive board moves masked for the learned/search hero. Legacy raw-action
+MCTS/dynamics traces are scaffold/debug evidence only.

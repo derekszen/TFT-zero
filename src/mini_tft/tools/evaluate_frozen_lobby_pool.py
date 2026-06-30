@@ -13,10 +13,10 @@ from numpy.typing import NDArray
 
 from mini_tft.core.actions import Action
 from mini_tft.core.config import EnvConfig
-from mini_tft.core.featurize import featurize_state
 from mini_tft.core.lobby import Set1LobbyState
 from mini_tft.core.lobby_step import LobbyActionRecord, LobbyPolicy
 from mini_tft.core.set_data import GameData
+from mini_tft.rl.checkpoint_policy import CheckpointFormat, load_lobby_checkpoint_policy
 from mini_tft.rl.lobby_env import MiniTFTLobbyEnv
 
 
@@ -29,14 +29,25 @@ def run_frozen_lobby_pool_evaluation(
     player_count: int = 8,
     max_actions_per_player: int | None = None,
     device: str = "cpu",
+    hero_checkpoint_format: CheckpointFormat = "auto",
+    opponent_checkpoint_format: CheckpointFormat = "auto",
     name: str = "frozen_lobby_pool",
     config: EnvConfig | None = None,
 ) -> dict[str, Any]:
     """Run seeded lobbies with player 0 against cycling frozen PPO checkpoints."""
 
-    hero_policy = _checkpoint_policy(hero_checkpoint, device=device)
+    hero_policy = _checkpoint_policy(
+        hero_checkpoint,
+        checkpoint_format=hero_checkpoint_format,
+        device=device,
+    )
     opponent_policies = tuple(
-        _checkpoint_policy(checkpoint, device=device) for checkpoint in opponent_checkpoints
+        _checkpoint_policy(
+            checkpoint,
+            checkpoint_format=opponent_checkpoint_format,
+            device=device,
+        )
+        for checkpoint in opponent_checkpoints
     )
     return run_lobby_policy_pool_evaluation(
         name=name,
@@ -265,31 +276,17 @@ def _pooled_policy(
     return policy
 
 
-def _checkpoint_policy(checkpoint: Path, *, device: str) -> LobbyPolicy:
-    try:
-        from sb3_contrib import MaskablePPO
-    except ImportError as exc:
-        raise SystemExit("Install training dependencies with `uv sync --extra train`.") from exc
-
-    model = MaskablePPO.load(checkpoint, device=device)
-
-    def policy(
-        player_id: int,
-        state: Set1LobbyState,
-        mask: NDArray[np.bool_],
-        data: GameData,
-        config: EnvConfig,
-        _rng: np.random.Generator,
-    ) -> int:
-        obs = featurize_state(state.players[player_id], data, config)
-        action, _ = model.predict(
-            obs,
-            deterministic=True,
-            action_masks=mask,
-        )
-        return int(action)
-
-    return policy
+def _checkpoint_policy(
+    checkpoint: Path,
+    *,
+    checkpoint_format: CheckpointFormat = "auto",
+    device: str,
+) -> LobbyPolicy:
+    return load_lobby_checkpoint_policy(
+        checkpoint,
+        checkpoint_format=checkpoint_format,
+        device=device,
+    )
 
 
 def _count_actions(
@@ -327,6 +324,16 @@ def main(argv: Iterable[str] | None = None) -> int:
     parser.add_argument("--players", type=int, default=8)
     parser.add_argument("--max-actions-per-player", type=int, default=None)
     parser.add_argument("--device", default="cpu")
+    parser.add_argument(
+        "--hero-checkpoint-format",
+        choices=["auto", "sb3", "puffer"],
+        default="auto",
+    )
+    parser.add_argument(
+        "--opponent-checkpoint-format",
+        choices=["auto", "sb3", "puffer"],
+        default="auto",
+    )
     parser.add_argument("--name", default="frozen_lobby_pool")
     parser.add_argument("--format", choices=["markdown", "json"], default="markdown")
     args = parser.parse_args(list(argv) if argv is not None else None)
@@ -340,6 +347,8 @@ def main(argv: Iterable[str] | None = None) -> int:
         player_count=args.players,
         max_actions_per_player=args.max_actions_per_player,
         device=args.device,
+        hero_checkpoint_format=args.hero_checkpoint_format,
+        opponent_checkpoint_format=args.opponent_checkpoint_format,
     )
     if args.format == "json":
         print(json.dumps(report, indent=2, sort_keys=True))

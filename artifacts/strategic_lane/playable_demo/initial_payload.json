@@ -1,0 +1,78 @@
+{
+  "round": 1,
+  "stage": 1,
+  "stage_round": 1,
+  "stage_label": "Stage 1-1",
+  "hp": 100,
+  "gold": 3,
+  "level": 3,
+  "xp": 0,
+  "shop": [
+    3,
+    3,
+    2,
+    4,
+    1
+  ],
+  "owned": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "fielded": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "role_items": [
+    0,
+    0,
+    0
+  ],
+  "role_item_slots": [
+    0,
+    0,
+    0
+  ],
+  "board_strength": 0.0,
+  "enemy_strength": 50.895,
+  "placement_proxy": 8,
+  "scenario_score": 0.2625,
+  "legal_actions": [
+    {
+      "id": 0,
+      "name": "hold"
+    },
+    {
+      "id": 2,
+      "name": "roll"
+    },
+    {
+      "id": 4,
+      "name": "buy_best_synergy"
+    },
+    {
+      "id": 5,
+      "name": "buy_highest_cost"
+    },
+    {
+      "id": 7,
+      "name": "greed_econ"
+    }
+  ],
+  "done": false,
+  "final_reason": null
+}

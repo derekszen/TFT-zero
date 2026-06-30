@@ -1,5 +1,8 @@
 # Project Brief
 
+Historical brief. For current status, use `README.md`; for active MuZero-stage
+work, use `docs/MUZERO_STAGE_GATE.md`.
+
 TFT-zero is a Python-first research prototype for learning TFT-like macro play.
 
 The first objective is not a perfect clone. The first objective is a simulator

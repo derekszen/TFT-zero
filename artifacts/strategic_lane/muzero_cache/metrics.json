@@ -1,0 +1,27 @@
+{
+  "schema": "quality-gate/v1",
+  "deliverable": "muzero_cache",
+  "status": "smoke_only",
+  "seed": 0,
+  "commands": [
+    "python -m mini_tft.tools.strategic_lane_gate"
+  ],
+  "metrics": {
+    "rows": 128,
+    "observation_dim": 38,
+    "action_dim": 11,
+    "legal_action_rate": 1.0,
+    "mean_reward": 0.018397744963919035,
+    "mean_value_target": -0.286001372384762,
+    "terminal_rows": 2
+  },
+  "artifacts": [
+    "rows.jsonl",
+    "metrics.json",
+    "decision.md"
+  ],
+  "known_limits": [
+    "rows are policy/value cache smoke data",
+    "this command does not train or promote a MuZero model"
+  ]
+}

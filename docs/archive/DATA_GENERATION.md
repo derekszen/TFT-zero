@@ -8,7 +8,7 @@ Use three data sources over time:
 
 - scripted bots for bootstrap data
 - on-policy PPO or other RL rollout data
-- later teacher/search-generated labels
+- search-generated labels from the MuZero-stage loop
 
 Do not wait for real game data. It is optional and mostly useful for realism or
 human imitation later.
@@ -58,6 +58,22 @@ Each transition should save:
   "return_to_go": 3.7
 }
 ```
+
+## Stage 5 Search-Target Schema
+
+Stage 5 replay buffers should preserve the fields needed to audit search-target
+feedback:
+
+- observation
+- legal action mask
+- selected action
+- visit policy or improved policy target
+- reward
+- scalar value target
+- done flag
+- stage/round metadata
+- source policy or planner
+- seed and decision index
 
 ## State Fields To Preserve
 

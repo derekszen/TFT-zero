@@ -1,0 +1,24 @@
+# Strategic MCTS Smoke
+
+Status: `smoke_only`
+
+## Evidence
+
+- Seed: 9100
+- Episodes per policy: 8
+- Simulation counts: 8, 16, 32
+- Elapsed sec: 8.325
+
+| Policy | Sims | Mean placement | Mean final round | Death rate | Scenario score | Reward | Decisions/sec | Sims/sec |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| heuristic | 0 | 6.875 | 16.875 | 1.000 | 0.330 | -0.693 | 0.00 | 0.00 |
+| mcts_16 | 16 | 6.875 | 16.875 | 1.000 | 0.330 | -0.693 | 171.44 | 2742.96 |
+| mcts_32 | 32 | 6.875 | 17.000 | 1.000 | 0.336 | -0.421 | 84.49 | 2703.83 |
+| mcts_8 | 8 | 6.875 | 16.875 | 1.000 | 0.330 | -0.693 | 351.55 | 2812.36 |
+| random | 0 | 7.000 | 15.125 | 1.000 | 0.277 | -2.577 | 0.00 | 0.00 |
+
+## Limits
+
+- simulator-backed MCTS uses the real strategic simulator, not learned dynamics
+- placement_proxy is an elimination bucket, not real TFT placement
+- this is a smoke run unless episode counts and seed ranges are expanded

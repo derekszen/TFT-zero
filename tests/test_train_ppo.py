@@ -2,8 +2,17 @@ from __future__ import annotations
 
 from argparse import Namespace
 from pathlib import Path
+from typing import cast
 
+import numpy as np
+from gymnasium import spaces
+
+from mini_tft.core.config import EnvConfig
+from mini_tft.core.lobby import lobby_action_mask, new_lobby_state
+from mini_tft.core.set_data import load_set
+from mini_tft.rl.lobby_env import MiniTFTLobbyHeroEnv
 from mini_tft.rl.train_ppo import (
+    checkpoint_pool_lobby_policy,
     create_or_load_model,
     make_env,
     model_archive_path,
@@ -76,22 +85,60 @@ def test_resolve_rollout_and_batch_size_clamps_to_rollout() -> None:
 
 
 def test_make_env_supports_lobby_training_wrapper() -> None:
-    env = make_env(
+    env = cast(MiniTFTLobbyHeroEnv, make_env(
         123,
         env_kind="lobby",
         lobby_opponent_policy="tempo",
         players=4,
         max_actions_per_player=4,
         allow_oracle_macro_actions=False,
-    )()
+    )())
     try:
         obs, _info = env.reset(seed=123)
+        action_space = cast(spaces.Discrete, env.action_space)
         assert obs.ndim == 1
-        assert env.action_space.n > 0
-        assert env.action_masks().shape == (env.action_space.n,)
+        assert action_space.n > 0
+        assert env.action_masks().shape == (action_space.n,)
         assert not env.allow_oracle_macro_actions
     finally:
         env.close()
+
+
+def test_checkpoint_pool_lobby_policy_loads_lazily_and_cycles(monkeypatch) -> None:
+    loaded: list[tuple[Path, str]] = []
+
+    class FakeModel:
+        def __init__(self, action: int) -> None:
+            self.action = action
+
+        def predict(self, obs, *, deterministic: bool, action_masks):
+            assert obs.ndim == 1
+            assert deterministic is True
+            assert action_masks.ndim == 1
+            return self.action, None
+
+    def fake_load(checkpoint: Path, *, device: str):
+        loaded.append((checkpoint, device))
+        return FakeModel(10 + len(loaded))
+
+    monkeypatch.setattr("mini_tft.rl.train_ppo._load_maskable_ppo_checkpoint", fake_load)
+    policy = checkpoint_pool_lobby_policy(
+        [Path("a.zip"), Path("b.zip")],
+        device="cpu",
+    )
+    config = EnvConfig(seed=7)
+    data = load_set(config.dataset)
+    state = new_lobby_state(config, data, seed=7, player_count=4)
+    rng = np.random.default_rng(7)
+
+    action_1 = policy(1, state, lobby_action_mask(state, 1, data, config), data, config, rng)
+    action_2 = policy(2, state, lobby_action_mask(state, 2, data, config), data, config, rng)
+    action_3 = policy(3, state, lobby_action_mask(state, 3, data, config), data, config, rng)
+
+    assert action_1 == 11
+    assert action_2 == 12
+    assert action_3 == 11
+    assert loaded == [(Path("a.zip"), "cpu"), (Path("b.zip"), "cpu")]
 
 
 def test_write_experiment_manifest_records_model_path_and_args(tmp_path: Path) -> None:

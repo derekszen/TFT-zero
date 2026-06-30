@@ -6,14 +6,20 @@ import argparse
 import json
 import subprocess
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
 import gymnasium as gym
+import numpy as np
+from numpy.typing import NDArray
 
 from mini_tft.core.config import EnvConfig
+from mini_tft.core.featurize import featurize_state
+from mini_tft.core.lobby import Set1LobbyState
+from mini_tft.core.lobby_step import LobbyPolicy
+from mini_tft.core.set_data import GameData
 from mini_tft.rl.gym_env import MiniTFTGymEnv
 from mini_tft.rl.lobby_env import LOBBY_POLICY_BY_NAME, MiniTFTLobbyHeroEnv
 
@@ -23,6 +29,8 @@ def make_env(
     *,
     env_kind: str = "single_player",
     lobby_opponent_policy: str = "tempo",
+    lobby_opponent_checkpoints: Sequence[Path] | None = None,
+    lobby_opponent_device: str = "cpu",
     players: int = 8,
     max_actions_per_player: int | None = None,
     allow_oracle_macro_actions: bool = True,
@@ -35,7 +43,11 @@ def make_env(
             return MiniTFTLobbyHeroEnv(
                 config=config,
                 player_count=players,
-                opponent_policy=_lobby_policy_by_name(lobby_opponent_policy),
+                opponent_policy=_lobby_opponent_policy(
+                    lobby_opponent_policy,
+                    checkpoints=lobby_opponent_checkpoints,
+                    device=lobby_opponent_device,
+                ),
                 max_actions_per_player=max_actions_per_player,
                 allow_oracle_macro_actions=allow_oracle_macro_actions,
             )
@@ -67,6 +79,21 @@ def main() -> None:
         choices=sorted(LOBBY_POLICY_BY_NAME),
         default="tempo",
     )
+    parser.add_argument(
+        "--lobby-opponent-checkpoint",
+        type=Path,
+        action="append",
+        default=None,
+        help=(
+            "Frozen MaskablePPO opponent checkpoint. Repeat to train against a "
+            "cycling checkpoint pool instead of --lobby-opponent-policy."
+        ),
+    )
+    parser.add_argument(
+        "--lobby-opponent-device",
+        default="cpu",
+        help="Device used to load frozen lobby opponent checkpoints.",
+    )
     parser.add_argument("--players", type=int, default=8)
     parser.add_argument("--max-actions-per-player", type=int, default=None)
     parser.add_argument(
@@ -95,6 +122,8 @@ def main() -> None:
             args.seed + index,
             env_kind=args.env_kind,
             lobby_opponent_policy=args.lobby_opponent_policy,
+            lobby_opponent_checkpoints=args.lobby_opponent_checkpoint,
+            lobby_opponent_device=args.lobby_opponent_device,
             players=args.players,
             max_actions_per_player=args.max_actions_per_player,
             allow_oracle_macro_actions=not args.disallow_oracle_macro_actions,
@@ -206,7 +235,14 @@ def print_resolved_config(args: argparse.Namespace, *, rollout_size: int, batch_
     print(f"- mode: {mode}")
     print(f"- env_kind: {args.env_kind}")
     if args.env_kind == "lobby":
-        print(f"- lobby_opponent_policy: {args.lobby_opponent_policy}")
+        if args.lobby_opponent_checkpoint:
+            print("- lobby_opponent_policy: frozen_checkpoint_pool")
+            print(
+                "- lobby_opponent_checkpoints: "
+                + ", ".join(str(path) for path in args.lobby_opponent_checkpoint)
+            )
+        else:
+            print(f"- lobby_opponent_policy: {args.lobby_opponent_policy}")
         print(f"- players: {args.players}")
         print(f"- max_actions_per_player: {args.max_actions_per_player}")
         print(f"- allow_oracle_macro_actions: {allow_oracle_macro_actions}")
@@ -266,6 +302,61 @@ def _lobby_policy_by_name(name: str):
         raise ValueError(
             f"unknown lobby opponent policy {name!r}; choose one of: {choices}"
         ) from exc
+
+
+def _lobby_opponent_policy(
+    name: str,
+    *,
+    checkpoints: Sequence[Path] | None = None,
+    device: str = "cpu",
+) -> LobbyPolicy:
+    if checkpoints:
+        return checkpoint_pool_lobby_policy(checkpoints, device=device)
+    return _lobby_policy_by_name(name)
+
+
+def checkpoint_pool_lobby_policy(
+    checkpoints: Sequence[Path],
+    *,
+    device: str = "cpu",
+) -> LobbyPolicy:
+    checkpoint_paths = tuple(Path(checkpoint) for checkpoint in checkpoints)
+    if not checkpoint_paths:
+        raise ValueError("checkpoint pool must include at least one checkpoint")
+    models: tuple[Any, ...] | None = None
+
+    def policy(
+        player_id: int,
+        state: Set1LobbyState,
+        mask: NDArray[np.bool_],
+        data: GameData,
+        config: EnvConfig,
+        _rng: np.random.Generator,
+    ) -> int:
+        nonlocal models
+        if models is None:
+            models = tuple(
+                _load_maskable_ppo_checkpoint(checkpoint, device=device)
+                for checkpoint in checkpoint_paths
+            )
+        model = models[(player_id - 1) % len(models)]
+        obs = featurize_state(state.players[player_id], data, config)
+        action, _ = model.predict(
+            obs,
+            deterministic=True,
+            action_masks=mask,
+        )
+        return int(action)
+
+    return policy
+
+
+def _load_maskable_ppo_checkpoint(checkpoint: Path, *, device: str) -> Any:
+    try:
+        from sb3_contrib import MaskablePPO
+    except ImportError as exc:
+        raise SystemExit("Install training dependencies with `uv sync --extra train`.") from exc
+    return MaskablePPO.load(checkpoint, device=device)
 
 
 def _json_ready(value: Any) -> Any:

@@ -10,6 +10,9 @@ simulator. It runs detailed Python combat through a narrow adapter and writes
 fixed-schema fight labels. A `heuristic` teacher is available only for smoke
 tests and pipeline debugging.
 
+This is a combat-teacher path. It is separate from the MiniTFT Stage 5
+MuZero-style self-play/search-target loop.
+
 ## Generate Labels
 
 Small smoke:

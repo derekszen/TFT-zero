@@ -1,5 +1,8 @@
 # V0 Build Plan
 
+Archived V0 plan. For current status, use `README.md` and
+`docs/MUZERO_STAGE_GATE.md`.
+
 v0 is the smallest useful simulator that can generate RL transitions.
 
 ## Phase 1: Repo And Env Skeleton

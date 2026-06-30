@@ -1,0 +1,29 @@
+{
+  "schema": "quality-gate/v1",
+  "deliverable": "playable_demo",
+  "status": "smoke_only",
+  "seed": 0,
+  "commands": [
+    "python -m mini_tft.tools.strategic_lane_gate"
+  ],
+  "metrics": {
+    "round": 1,
+    "hp": 100,
+    "gold": 3,
+    "level": 3,
+    "legal_actions": 5,
+    "has_enemy_strength": true,
+    "has_placement_proxy": true,
+    "has_scenario_score": true,
+    "has_role_item_slots": true,
+    "stage_label": "Stage 1-1"
+  },
+  "artifacts": [
+    "initial_payload.json",
+    "metrics.json",
+    "decision.md"
+  ],
+  "known_limits": [
+    "browser route is not wired to this strategic payload yet"
+  ]
+}
