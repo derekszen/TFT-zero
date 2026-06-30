@@ -12,9 +12,7 @@ This repository is the submission landing page. The current report packet is:
 
 - [Paper/report agent context](artifacts/paper_agent_context/README.md)
 
-When the final PDF exists, link it here:
-
-- Paper: `TODO: add final PDF link`
+- [Paper draft](https://prism.openai.com/?u=db147769-d04d-4a0c-bd51-3123fc427703&pg=1&m=neurips_2026.tex&d=7)
 
 ## What This Shows
 
