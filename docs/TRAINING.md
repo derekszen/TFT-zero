@@ -90,6 +90,20 @@ strategic simulator
   -> quality gate decision
 ```
 
+Run the reusable strategic MuZero-style smoke loop with:
+
+```bash
+env -u UV_PYTHON uv run python -m mini_tft.tools.strategic_muzero_run_loop \
+  --out-dir artifacts/strategic_lane/muzero_run_loop \
+  --seed 1000 \
+  --cache-rows 1024 \
+  --strict
+```
+
+The loop writes fresh parity, baseline, cache, train-smoke, and verifier
+artifacts under the output directory. The full trainer should preserve that
+artifact contract and replace only the train-smoke stage.
+
 The cache path should write auditable observations, masks, actions, rewards,
 next observations, dones, policy targets, value targets, and metadata.
 

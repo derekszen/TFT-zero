@@ -175,6 +175,93 @@ gate uses batch size 256 and records the result under
 - Trains at least a tiny policy/value/dynamics smoke model from the cache.
 - Labels results as smoke unless they beat baselines under `QUALITY_GATE`.
 
+Current loop scaffold:
+
+```bash
+env -u UV_PYTHON uv run python -m mini_tft.tools.strategic_muzero_run_loop \
+  --out-dir artifacts/strategic_lane/muzero_run_loop \
+  --seed 1000 \
+  --cache-episodes 64 \
+  --cache-rows 1024 \
+  --mcts-simulations 16 \
+  --mcts-max-depth 10 \
+  --mcts-rollout-steps 6 \
+  --mcts-prior-mode heuristic \
+  --train-epochs 24 \
+  --train-learning-rate 0.03 \
+  --baseline-episodes 32 \
+  --strict
+```
+
+This writes the full reusable loop tree:
+
+```text
+artifacts/strategic_lane/muzero_run_loop/
+  parity_matrix/
+  policy_eval/
+  cache/
+  train_smoke/
+  gate/
+  verifier/
+  metrics.json
+  decision.md
+  final_report.md
+  loop-state.json
+  loop-run-log.md
+```
+
+The top-level `metrics.json` exposes `programmatic_criteria` copied from
+`gate/verifier/metrics.json`; queue-readiness is decided by those named checks,
+not by an LLM judge.
+
+Individual stage commands remain available for debugging:
+
+```bash
+env -u UV_PYTHON uv run python -m mini_tft.tools.strategic_parity_matrix \
+  --out-dir artifacts/strategic_lane/parity_matrix \
+  --strict
+
+env -u UV_PYTHON uv run python -m mini_tft.tools.generate_strategic_muzero_cache \
+  --out-dir artifacts/strategic_lane/muzero_mcts_cache_goal1 \
+  --episodes 64 \
+  --max-rows 1024 \
+  --seed 1000 \
+  --simulations 16 \
+  --max-depth 10 \
+  --rollout-steps 6 \
+  --prior-mode heuristic \
+  --strict
+
+env -u UV_PYTHON uv run python -m mini_tft.tools.train_strategic_muzero_smoke \
+  --rows artifacts/strategic_lane/muzero_mcts_cache_goal1/rows.jsonl \
+  --out-dir artifacts/strategic_lane/muzero_train_smoke_goal1 \
+  --epochs 24 \
+  --learning-rate 0.03 \
+  --seed 2000 \
+  --strict
+
+env -u UV_PYTHON uv run python -m mini_tft.tools.strategic_muzero_loop \
+  --out-dir artifacts/strategic_lane/muzero_loop_goal1 \
+  --cache-metrics artifacts/strategic_lane/muzero_mcts_cache_goal1/metrics.json \
+  --cache-rows-jsonl artifacts/strategic_lane/muzero_mcts_cache_goal1/rows.jsonl \
+  --train-metrics artifacts/strategic_lane/muzero_train_smoke_goal1/metrics.json \
+  --baseline-metrics artifacts/strategic_lane/policy_eval/metrics.json \
+  --parity-metrics artifacts/strategic_lane/parity_matrix/metrics.json \
+  --min-cache-rows 1024 \
+  --strict
+```
+
+Use `--cache-rows-jsonl`, `--mcts-metrics`, `--train-metrics`, and
+`--baseline-metrics` to consolidate a concrete run. The verifier rejects until
+cache rows contain MCTS visit-policy targets, legal masks/targets validate, the
+tiny train smoke has finite losses, reproducibility is recorded, and baseline
+evidence is present. Queue-ready MuZero runs also require the parity matrix to
+pass for Python core, native C++, and Ocean C.
+
+Keep legacy Stage 2-5, candidate-choice, and non-strategic MuZero scripts in
+`docs/archive/` out of this loop unless a new runbook explicitly reactivates
+them.
+
 ### Playable Demo Adapter
 
 - Uses the same strategic rules.

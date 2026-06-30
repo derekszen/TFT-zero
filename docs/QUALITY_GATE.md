@@ -66,6 +66,7 @@ For Puffer claims, include a matched benchmark artifact with:
 
 For MuZero-style cache claims, include:
 
+- strategic parity matrix status when using native C++ or Ocean C fast paths;
 - cache schema and row count;
 - legal action mask validation;
 - policy/value target validation;
