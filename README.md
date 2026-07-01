@@ -4,25 +4,72 @@
   <img src="https://i.redd.it/7musegquo5kf1.gif" alt="Teamfight Tactics gameplay reference" width="900">
 </p>
 
-TFT-Zero is a compact research scaffold for testing **TFT-shaped strategic
-planning** with deterministic simulator rules, legal action masks, fast
-rollouts, PufferLib 4.0 Ocean-style C infrastructure, and simulator-backed
-MCTS.
+TFT-Zero is a compact TFT-shaped strategic planning testbed. It keeps the
+macro loop - shop, gold, rolling, leveling, board strength, item slams, fight
+pressure, HP - while using a simplified Markov simulator with a shared
+38-dimensional observation and 11-action legal mask.
 
-This is not a Riot-accurate TFT clone, a ranked-player claim, a current-patch
-planner, or a completed MuZero system. The active lane is a simplified Markov
-strategic simulator intended for controlled planning and throughput
-experiments.
+This repository is not a Riot-accurate TFT clone and does not claim real TFT
+ranked performance. The current evidence is easiest to read as two results:
 
-Current handoff material:
+1. **Speed / infrastructure result:** the strategic environment now runs through
+   PufferLib 4.0 Ocean-style C and CUDA trainer smoke paths at multi-million
+   step throughput.
+2. **Trained-model result:** a CUDA Torch V0 policy/value/dynamics checkpoint
+   trains on simulator-backed MCTS cache targets and passes the current
+   readiness gate, but it is not full iterative MuZero self-play.
 
-- [Hosted MiniTFT prototype](https://minitft.wahrwelt.world/)
+Useful links:
+
+- [Link to the simulator](https://minitft.wahrwelt.world/)
 - [Paper/report agent context](artifacts/paper_agent_context/README.md)
 - [Paper draft in OpenAI Prism](https://prism.openai.com/?u=db147769-d04d-4a0c-bd51-3123fc427703&pg=1&m=neurips_2026.tex&d=7)
 
-## AI Agent Quick Onboarding
+## Result 1: Speed
 
-Use this section before making claims or queuing new runs.
+Main claim-safe speed evidence:
+
+| Measurement | Result | Status |
+| --- | --- | --- |
+| Python scalar strategic heuristic loop | `25,259.39` steps/sec | reference smoke |
+| PufferLib 4.0 Ocean C standalone loop | `3,755,013.36` steps/sec, `148.66x` scalar | `smoke_only` |
+| PufferLib 4.0 CUDA trainer path | `9,017,194` agent steps/sec, `356.98x` scalar over `262,144` agent steps | `smoke_only` |
+| Checkpoint-guided native-root MCTS cache generation | `8,180.78` decisions/sec and `130,892.43` simulations/sec for `native_root_prior_cuda_s16`; `46.02x` at 16 sims and `151.89x` at 64 sims vs single-root CPU Python checkpoint-guided MCTS | `accepted_l3_speedup` |
+
+The Puffer numbers are rollout/trainer-throughput smoke results on a 32 GB RTX
+5090 D workstation. The checkpoint-guided MCTS speed result proves the current
+cache-generation path can batch checkpoint root priors and hand them to a
+compiled native-root MCTS backend. It does not yet prove native learned
+leaf-value search or final policy quality.
+
+## Result 2: Trained Model
+
+Latest trained-checkpoint evidence:
+
+| Measurement | Result |
+| --- | --- |
+| Main evidence packet | `muzero_overnight_20260630T174428Z` |
+| Checkpoint | `train_torch/strategic_muzero_torch.pt` |
+| Cache rows | `262,144` |
+| Observation / action shape | `38 x 11` |
+| Legal action rate / policy-target validity | `1.0 / 1.0` |
+| Native MCTS cache target speed | `5,710.97` decisions/sec at 64 simulations |
+| Torch V0 train setup | CUDA, hidden size `256`, batch size `2048`, `64` epochs |
+| Total loss | `4.620549 -> 0.835981` |
+| Policy loss | `1.916569 -> 0.798829` |
+| Value loss | `2.674111 -> 0.036199` |
+| Dynamics loss | `0.119474 -> 0.003810` |
+| Policy target top-1 accuracy | `0.131397 -> 0.970245` |
+| Legal argmax rate | `1.0` |
+| Gate verdict | `ACCEPT`, `21/21` checks |
+
+Policy-evaluation smoke for the trained checkpoint is deliberately modest:
+`torch_muzero` has mean placement proxy `7.0`, mean reward `-2.267`, and mean
+scenario score `0.2127` over 512 episodes. The heuristic baseline is still
+slightly better by reward and scenario score. This is useful trained-checkpoint
+evidence and queue readiness; it is not a solved-policy claim.
+
+## AI Agent Quick Onboarding
 
 Read these first:
 
@@ -32,24 +79,50 @@ Read these first:
 4. [docs/TRAINING.md](docs/TRAINING.md)
 5. [artifacts/paper_agent_context/README.md](artifacts/paper_agent_context/README.md)
 
-Current report evidence in the main checkout starts here:
+Then inspect the core files:
 
-- `artifacts/strategic_lane/muzero_run_loop/metrics.json`
-- `artifacts/strategic_lane/mcts_native_overnight_20260630T235353/metrics.json`
-- `artifacts/strategic_lane/puffer4_speedup_paper/metrics.json`
+```text
+src/mini_tft/strategic/core/actions.py
+src/mini_tft/strategic/core/state.py
+src/mini_tft/strategic/core/rules.py
+src/mini_tft/strategic/core/obs.py
+src/mini_tft/strategic/adapters/mcts.py
+src/mini_tft/strategic/adapters/muzero_cache/export.py
+src/mini_tft/strategic/ocean/strategic_tft.c
+src/mini_tft/tools/benchmark_puffer4_ocean.py
+src/mini_tft/tools/run_strategic_muzero_overnight.py
+src/mini_tft/tools/strategic_muzero_run_loop.py
+```
 
-Latest overnight result:
+Use this command style:
 
-- `/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/muzero_overnight_20260630T174428Z/metrics.json`
+```bash
+env -u UV_PYTHON uv run ...
+```
 
-This was run locally on an RTX 5090 D workstation with about 32 GB VRAM using
-`mini_tft.tools.run_strategic_muzero_overnight`. It produced `262,144`
-legal-masked cache rows, native-MCTS cache targets at `5,710.97` decisions/sec,
-CUDA Torch V0 training for `64` epochs, total loss `4.620549 -> 0.835981`, and
-a gate verdict of `ACCEPT` with `21/21` checks. It is `smoke_only`
-cache-supervised MuZero-style evidence, not full iterative MuZero self-play.
+Basic validation:
 
-Queue a scaffolded MuZero-readiness run:
+```bash
+uv sync
+env -u UV_PYTHON uv run pytest
+env -u UV_PYTHON uv run ruff check
+env -u UV_PYTHON uv run --all-extras pyright
+git diff --check
+```
+
+Queue a scaffolded PufferLib 4.0 Ocean C speed run:
+
+```bash
+RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
+OUT="artifacts/strategic_lane/puffer4_ocean_${RUN_ID}"
+
+env -u UV_PYTHON uv run python -m mini_tft.tools.benchmark_puffer4_ocean \
+  --out-dir "$OUT" \
+  --envs 4096 \
+  --steps 10000000
+```
+
+Queue the end-to-end MuZero-readiness scaffold:
 
 ```bash
 RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -67,9 +140,9 @@ env -u UV_PYTHON uv run python -m mini_tft.tools.strategic_muzero_run_loop \
   --train-epochs 24 \
   --train-learning-rate 0.03 \
   --baseline-episodes 32 \
-  --codex-allowance-source "Codex usage dashboard" \
-  --codex-5h-window-remaining ample \
-  --codex-weekly-usage ample \
+  --codex-allowance-source user-waived \
+  --codex-5h-window-remaining user-waived \
+  --codex-weekly-usage user-waived \
   --codex-allowance-decision continue \
   --parity-seed 0 \
   --parity-seed 1 \
@@ -78,284 +151,100 @@ env -u UV_PYTHON uv run python -m mini_tft.tools.strategic_muzero_run_loop \
   --strict
 ```
 
-This regenerates the cache, Python MCTS targets, tiny linear train smoke,
-baseline eval, parity matrix, quality gate, and verifier. It is a readiness
-run, not production MuZero training.
-
-Queue a scaffolded PufferLib 4.0 Ocean C speed smoke:
+Queue the larger CUDA Torch V0 overnight-style run only when the machine and
+budget are appropriate:
 
 ```bash
 RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
-OUT="artifacts/strategic_lane/puffer4_ocean_${RUN_ID}"
-
-env -u UV_PYTHON uv run python -m mini_tft.tools.benchmark_puffer4_ocean \
-  --out-dir "$OUT" \
-  --envs 4096 \
-  --steps 10000000
-```
-
-Queue a checkpoint-guided strategic MCTS smoke after a Torch V0 checkpoint
-exists:
-
-```bash
-RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
-OUT="artifacts/strategic_lane/checkpoint_guided_mcts_${RUN_ID}"
-CHECKPOINT="/path/to/strategic_muzero_torch.pt"
+OUT="artifacts/strategic_lane/muzero_overnight_${RUN_ID}"
 
 env -u UV_PYTHON uv run --extra train \
-  python -m mini_tft.tools.checkpoint_guided_mcts_smoke \
+  python -m mini_tft.tools.run_strategic_muzero_overnight \
   --out-dir "$OUT" \
-  --checkpoint "$CHECKPOINT" \
-  --episodes 512 \
-  --max-rows 8192 \
-  --simulations 64 \
-  --max-depth 10 \
-  --rollout-steps 6 \
+  --seed 5000 \
+  --cache-episodes 8192 \
+  --cache-rows 262144 \
+  --mcts-simulations 64 \
+  --mcts-max-depth 8 \
+  --mcts-rollout-steps 4 \
+  --mcts-prior-mode heuristic \
+  --train-epochs 64 \
+  --train-learning-rate 0.001 \
+  --train-batch-size 2048 \
+  --hidden-size 256 \
+  --device auto \
+  --eval-episodes 512 \
+  --parity-seed 0 \
+  --parity-seed 1 \
+  --parity-seed 7 \
+  --parity-seed 19 \
+  --codex-allowance-source user-waived \
+  --codex-five-hour-window-remaining user-waived \
+  --codex-weekly-usage user-waived \
+  --codex-allowance-decision continue \
   --strict
 ```
 
-The primary rows use checkpoint policy priors with heuristic leaf values.
-Checkpoint leaf values are recorded as a matched ablation, not as the default
-promotion path.
+## Evidence Paths
 
-The saved CUDA trainer smoke was run from a PufferLib 4.0 checkout, not from
-the repo root:
-
-```bash
-cd /tmp/PufferLib-4.0
-env -u UV_PYTHON uv run --all-extras python -m pufferlib.pufferl train strategic_tft \
-  --train.total-timesteps 262144 \
-  --checkpoint-dir /mnt/ssd2/Projects/TFT-zero/artifacts/strategic_lane/puffer4_train_smoke/checkpoints \
-  --log-dir /mnt/ssd2/Projects/TFT-zero/artifacts/strategic_lane/puffer4_train_smoke/logs \
-  --checkpoint-interval 1000000000
-```
-
-When updating results for a paper-writing agent:
-
-1. Treat `metrics.json`, `final_report.md`, and `decision.md` as source
-   evidence, not memory.
-2. Update both this README and
-   `artifacts/paper_agent_context/README.md` with exact paths, dates, statuses,
-   row counts, speeds, loss deltas, and verifier verdicts.
-3. Preserve artifact status labels exactly; do not promote a result beyond its
-   artifact status.
-4. For MuZero evidence, always state whether the result is the tiny NumPy train
-   smoke, the cache-supervised Torch V0 trainer, or a full iterative recurrent
-   MuZero trainer. The current overnight result is Torch V0, not full MuZero.
-5. Run `git diff --check README.md artifacts/paper_agent_context/README.md`
-   after documentation edits.
-
-## Latest Evidence
-
-As of 2026-07-01, the strongest current evidence is:
-
-| Lane | Main artifact | Key result | Status |
-| --- | --- | --- | --- |
-| PufferLib 4.0 C/Ocean and CUDA trainer smoke | `artifacts/strategic_lane/puffer4_speedup_paper/metrics.json` | Python scalar `25,259.39` steps/s; Ocean C standalone `3,755,013.36` steps/s (`148.66x`); CUDA trainer smoke `9,017,194` agent steps/s (`356.98x`) | `smoke_only` |
-| Strategic MuZero overnight V0 | `/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/muzero_overnight_20260630T174428Z/metrics.json` | RTX 5090 D local smoke: `262,144` cache rows, obs/action shape `38 x 11`, native MCTS targets at `5,710.97` decisions/s, CUDA Torch training for `64` epochs, total loss `4.620549 -> 0.835981`, gate `ACCEPT` with `21/21` checks | `smoke_only` |
-| MuZero-readiness loop | `artifacts/strategic_lane/muzero_run_loop/metrics.json` | `1024` cache rows, obs/action shape `38 x 11`, legal action rate `1.0`, MCTS target rate `1.0`, verifier `ACCEPT` with `21/21` checks | `pass` for readiness |
-| Tiny train smoke over MuZero-style cache | `artifacts/strategic_lane/muzero_run_loop/train_smoke/metrics.json` | total loss `4.892351 -> 2.340075`, policy loss `2.396928 -> 2.043442`, value loss `2.372969 -> 0.200895`, dynamics loss `0.122454 -> 0.095737` | `smoke_only` |
-| Native simulator-backed MCTS overnight | `artifacts/strategic_lane/mcts_native_overnight_20260630T235353/metrics.json` | `65,536` episodes/policy; best reward and scenario score from `mcts_1024`; `mcts_1024` reward `-1.339` vs heuristic `-2.187`; `446,638` simulations/s at 1024 sims | `smoke_only` |
-| Python simulator-backed MCTS overnight | `artifacts/strategic_lane/mcts_overnight_20260630T203555/metrics.json` | `1,024` episodes/policy; best placement from `mcts_64`; best reward and scenario score from `mcts_256` | `smoke_only` |
-
-Current claim-safe reading:
-
-- PufferLib 4.0 infrastructure can compile and produce high-throughput smoke
-  results for the strategic C/Ocean environment.
-- The MuZero-readiness loop can generate deterministic cache/search/train-smoke
-  artifacts with legal masks, policy targets, value targets, parity evidence,
-  and verifier acceptance.
-- The local RTX 5090 D overnight smoke scales this to 262k rows and a CUDA
-  Torch supervised trainer over simulator/MCTS targets.
-- Native simulator-backed MCTS improves reward and scenario score in the latest
-  overnight run, but not the placement proxy.
-- No full iterative MuZero self-play or learned model-backed search result has
-  been launched.
-
-## Main Artifacts
-
-Paper/report handoff:
-
-```text
-artifacts/paper_agent_context/README.md
-```
-
-Latest MuZero-readiness loop:
-
-```text
-artifacts/strategic_lane/muzero_run_loop/metrics.json
-artifacts/strategic_lane/muzero_run_loop/final_report.md
-artifacts/strategic_lane/muzero_run_loop/decision.md
-artifacts/strategic_lane/muzero_run_loop/cache/rows.jsonl
-artifacts/strategic_lane/muzero_run_loop/train_smoke/train_smoke.npz
-artifacts/strategic_lane/muzero_run_loop/verifier/metrics.json
-```
-
-Latest local overnight smoke:
-
-```text
-/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/muzero_overnight_20260630T174428Z/metrics.json
-/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/muzero_overnight_20260630T174428Z/final_report.md
-/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/muzero_overnight_20260630T174428Z/train_torch/strategic_muzero_torch.pt
-```
-
-Native MCTS overnight:
-
-```text
-artifacts/strategic_lane/mcts_native_overnight_20260630T235353/metrics.json
-artifacts/strategic_lane/mcts_native_overnight_20260630T235353/paper_table.md
-artifacts/strategic_lane/mcts_native_overnight_20260630T235353/episodes.jsonl
-artifacts/strategic_lane/mcts_native_overnight_20260630T235353/decisions.jsonl
-artifacts/strategic_lane/mcts_native_overnight_20260630T235353/command.txt
-```
-
-PufferLib 4.0 speed smoke:
+Speed:
 
 ```text
 artifacts/strategic_lane/puffer4_speedup_paper/metrics.json
 artifacts/strategic_lane/puffer4_speedup_paper/final_report.md
 artifacts/strategic_lane/puffer4_speedup_paper/decision.md
-artifacts/strategic_lane/puffer4_train_smoke/
-artifacts/strategic_lane/puffer4_ocean/
-artifacts/strategic_lane/puffer4_ocean_after_rng_fix/
-artifacts/strategic_lane/puffer4_ocean_commit_smoke/
+/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/batched_cuda_mcts_20260701T030801Z/metrics.json
+/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/batched_cuda_mcts_20260701T030801Z/final_report.md
 ```
 
-Playable payload smoke:
+Trained model:
 
 ```text
-artifacts/strategic_lane/playable_demo/initial_payload.json
+/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/muzero_overnight_20260630T174428Z/metrics.json
+/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/muzero_overnight_20260630T174428Z/final_report.md
+/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/muzero_overnight_20260630T174428Z/train_torch/metrics.json
+/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/muzero_overnight_20260630T174428Z/train_torch/strategic_muzero_torch.pt
+```
+
+Readiness and smaller smoke evidence:
+
+```text
+artifacts/strategic_lane/muzero_run_loop/metrics.json
+artifacts/strategic_lane/muzero_run_loop/final_report.md
+artifacts/strategic_lane/muzero_run_loop/train_smoke/metrics.json
+artifacts/strategic_lane/mcts_native_overnight_20260630T235353/metrics.json
 artifacts/strategic_lane/playable_demo/metrics.json
-artifacts/strategic_lane/playable_demo/decision.md
 ```
 
-Older artifacts under `docs/archive/` and older strategic-lane artifact
-directories are historical unless explicitly rerun.
+## Paper-Agent Update Rule
 
-## Code Map
+When updating this README for a paper-writing agent:
 
-Core strategic simulator:
-
-```text
-src/mini_tft/strategic/core/actions.py
-src/mini_tft/strategic/core/state.py
-src/mini_tft/strategic/core/rules.py
-src/mini_tft/strategic/core/obs.py
-```
-
-Strategic adapters:
-
-```text
-src/mini_tft/strategic/adapters/baselines/policies.py
-src/mini_tft/strategic/adapters/mcts.py
-src/mini_tft/strategic/adapters/muzero_cache/export.py
-src/mini_tft/strategic/adapters/puffer/vector_env.py
-src/mini_tft/strategic/adapters/puffer/benchmark.py
-src/mini_tft/strategic/adapters/web_demo/payload.py
-```
-
-PufferLib 4.0 Ocean-style C scaffold:
-
-```text
-src/mini_tft/strategic/ocean/strategic_tft.h
-src/mini_tft/strategic/ocean/strategic_tft.c
-src/mini_tft/strategic/ocean/binding.c
-config/strategic_tft.ini
-src/mini_tft/tools/benchmark_puffer4_ocean.py
-```
-
-MuZero-readiness, MCTS, and gate tools:
-
-```text
-src/mini_tft/tools/generate_strategic_muzero_cache.py
-src/mini_tft/tools/checkpoint_guided_mcts_smoke.py
-src/mini_tft/tools/train_strategic_muzero_smoke.py
-src/mini_tft/tools/strategic_muzero_loop.py
-src/mini_tft/tools/strategic_muzero_run_loop.py
-src/mini_tft/tools/strategic_mcts_smoke.py
-src/mini_tft/tools/strategic_parity_matrix.py
-src/mini_tft/tools/strategic_lane_gate.py
-src/mini_tft/tools/judge_packet.py
-```
-
-Legacy Puffer wrapper/training entry points, for historical comparison only:
-
-```text
-src/mini_tft/rl/puffer_env.py
-src/mini_tft/rl/train_puffer_ppo.py
-```
-
-## Reproduce Current Evidence
-
-Use `env -u UV_PYTHON uv run ...` for repo commands.
-
-Install and basic checks:
+1. Use artifact files as source evidence, not memory.
+2. Keep only the two headline result categories near the top: speed and trained
+   model.
+3. Preserve artifact status labels exactly, especially `smoke_only`,
+   `accepted_l3_speedup`, and gate verdicts.
+4. State whether a model is tiny NumPy train smoke, CUDA Torch V0 supervised
+   training, or full iterative MuZero. The current trained checkpoint is CUDA
+   Torch V0 supervised training, not full MuZero.
+5. Run:
 
 ```bash
-uv sync
-env -u UV_PYTHON uv run pytest
-env -u UV_PYTHON uv run ruff check
-env -u UV_PYTHON uv run --all-extras pyright
-git diff --check
+git diff --check README.md artifacts/paper_agent_context/README.md
 ```
-
-Strategic lane gate:
-
-```bash
-env -u UV_PYTHON uv run python -m mini_tft.tools.strategic_lane_gate
-```
-
-Native MCTS overnight command used for the latest artifact:
-
-```bash
-env -u UV_PYTHON uv run python -m mini_tft.tools.strategic_mcts_smoke \
-  --backend native \
-  --out-dir artifacts/strategic_lane/mcts_native_overnight_20260630T235353 \
-  --episodes 65536 \
-  --simulations 64 128 256 512 1024 \
-  --max-depth 10 \
-  --rollout-steps 8 \
-  --prior-mode heuristic \
-  --seed 9500 \
-  --strict
-```
-
-PufferLib 4.0 Ocean standalone smoke:
-
-```bash
-env -u UV_PYTHON uv run python -m mini_tft.tools.benchmark_puffer4_ocean \
-  --out-dir artifacts/strategic_lane/puffer4_ocean_commit_smoke \
-  --envs 512 \
-  --steps 100000
-```
-
-Build the strategic env inside a full PufferLib 4.0 checkout:
-
-```bash
-git clone --branch 4.0 https://github.com/PufferAI/PufferLib.git ../TFT-zero-puffer4
-cd ../TFT-zero-puffer4
-mkdir -p ocean/strategic_tft
-cp ../TFT-zero/src/mini_tft/strategic/ocean/strategic_tft.* ocean/strategic_tft/
-cp ../TFT-zero/src/mini_tft/strategic/ocean/binding.c ocean/strategic_tft/
-cp ../TFT-zero/config/strategic_tft.ini config/strategic_tft.ini
-bash build.sh strategic_tft --local
-```
-
-Use the Python strategic simulator as the parity oracle before reporting any
-new PufferLib 4.0 trainer number.
 
 ## Claim Boundaries
 
-- Toy and strategic-lane results are simplified simulator results.
+- Toy strategic-lane results are simplified simulator results.
 - `placement_proxy` is an elimination-timing bucket, not real TFT placement.
-- Puffer speed evidence is rollout/trainer-throughput evidence, not policy
-  quality evidence.
+- Puffer speed evidence is throughput evidence, not policy-quality evidence.
 - Native MCTS is simulator-backed search over the strategic rules, not learned
   MuZero dynamics.
-- The current MuZero train step is a tiny linear policy/value/dynamics smoke,
-  not full learned recurrent MuZero plus search training.
-- The Torch V0 overnight is supervised training on simulator/MCTS cache targets,
-  not full iterative MuZero self-play.
+- The trained Torch V0 checkpoint is supervised on simulator/MCTS cache targets.
+  It is not full iterative MuZero self-play and is not model-backed search.
+- The L3 native-root cache path injects checkpoint priors at the search root; it
+  does not yet call a checkpoint value model at native search leaves.
 - Full MuZero claims require model-backed search/reanalysis, legal masks,
   auditable cache rows, deterministic seeds, and baseline comparisons under
   [docs/QUALITY_GATE.md](docs/QUALITY_GATE.md).
