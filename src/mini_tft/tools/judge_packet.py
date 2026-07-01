@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import shutil
+import shlex
 import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -13,10 +13,11 @@ from pathlib import Path
 from typing import Any
 
 DELIVERABLES = ("muzero_cache", "puffer_speed", "playable_demo", "docs", "other")
-PREFERRED_JUDGE = "Antigravity"
-PREFERRED_MODEL = "Flash 3.5"
-PREFERRED_THINKING = "high"
-GEMINI_FALLBACK_MODEL = "gemini-3.5-flash"
+PREFERRED_JUDGE = "Antigravity via ai-router"
+PREFERRED_MODEL = "gemini-3.5-flash-low"
+PREFERRED_THINKING = "highest"
+PREFERRED_REASONING_EFFORT = "xhigh"
+AI_ROUTER_DIR = Path("/mnt/ssd2/Projects/ai-router")
 _SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 _SECTION_HEADERS = ("Evidence checked:", "Findings:", "Suggested action:")
 
@@ -31,8 +32,8 @@ class JudgePacketConfig:
     changed_files: tuple[str, ...] = ()
     evidence: tuple[str, ...] = ()
     validation_commands: tuple[str, ...] = ()
-    antigravity_cli_state: str = "auto"
-    gemini_cli_state: str = "auto"
+    ai_router_state: str = "auto"
+    ai_router_dir: Path = AI_ROUTER_DIR
 
 
 def generate_judge_packet(config: JudgePacketConfig) -> dict[str, Any]:
@@ -42,8 +43,7 @@ def generate_judge_packet(config: JudgePacketConfig) -> dict[str, Any]:
     out_dir = config.out_root / config.name
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    antigravity_cli_state = _resolve_cli_state("antigravity", config.antigravity_cli_state)
-    gemini_cli_state = _resolve_cli_state("gemini", config.gemini_cli_state)
+    ai_router_state = _resolve_ai_router_state(config.ai_router_dir, config.ai_router_state)
     created_at = datetime.now(UTC).isoformat()
 
     manifest: dict[str, Any] = {
@@ -63,7 +63,7 @@ def generate_judge_packet(config: JudgePacketConfig) -> dict[str, Any]:
         "prompt.md",
         "evidence_manifest.json",
         "verdict_template.md",
-        "gemini_fallback_command.txt",
+        "antigravity_ai_router_command.txt",
         "decision.md",
         "metrics.json",
     ]
@@ -79,10 +79,13 @@ def generate_judge_packet(config: JudgePacketConfig) -> dict[str, Any]:
             "preferred_runner": PREFERRED_JUDGE,
             "preferred_model": PREFERRED_MODEL,
             "thinking": PREFERRED_THINKING,
+            "reasoning_effort": PREFERRED_REASONING_EFFORT,
             "read_only": True,
             "fail_closed": True,
-            "antigravity_cli": antigravity_cli_state,
-            "gemini_cli": gemini_cli_state,
+            "provider": "ai-router CLIProxyAPI Antigravity OAuth",
+            "ai_router": ai_router_state,
+            "ai_router_dir": str(config.ai_router_dir),
+            "openai_base_url": "http://127.0.0.1:8317/v1",
         },
         "changed_files": list(config.changed_files),
         "evidence": list(config.evidence),
@@ -90,12 +93,12 @@ def generate_judge_packet(config: JudgePacketConfig) -> dict[str, Any]:
         "artifacts": artifacts,
         "strict_output_schema": _judge_contract(),
         "known_limits": [
-            "Antigravity is treated as an external IDE/manual runner unless a local CLI exists.",
+            "Antigravity is reached through local ai-router/CLIProxyAPI OAuth tokens.",
             (
                 "The packet only prepares evidence; the gate remains blocked until a strict "
                 "ACCEPT verdict."
             ),
-            "Gemini CLI fallback command shape is documented separately and must stay read-only.",
+            "The generated ai-router command is read-only and writes only verdict.md.",
         ],
     }
 
@@ -103,8 +106,8 @@ def generate_judge_packet(config: JudgePacketConfig) -> dict[str, Any]:
     _write_json(out_dir / "metrics.json", metrics)
     (out_dir / "prompt.md").write_text(_format_prompt(config, manifest), encoding="utf-8")
     (out_dir / "verdict_template.md").write_text(_format_verdict_template(), encoding="utf-8")
-    (out_dir / "gemini_fallback_command.txt").write_text(
-        _format_gemini_fallback_command(out_dir),
+    (out_dir / "antigravity_ai_router_command.txt").write_text(
+        _format_antigravity_ai_router_command(out_dir, config.ai_router_dir),
         encoding="utf-8",
     )
     (out_dir / "decision.md").write_text(_format_decision(metrics), encoding="utf-8")
@@ -143,15 +146,16 @@ def _validate_config(config: JudgePacketConfig) -> None:
         )
     if config.deliverable not in DELIVERABLES:
         raise ValueError(f"deliverable must be one of {', '.join(DELIVERABLES)}")
-    for state in (config.antigravity_cli_state, config.gemini_cli_state):
-        if state not in {"auto", "available", "unavailable"}:
-            raise ValueError("CLI state must be auto, available, or unavailable")
+    if config.ai_router_state not in {"auto", "available", "unavailable"}:
+        raise ValueError("ai-router state must be auto, available, or unavailable")
 
 
-def _resolve_cli_state(command: str, requested: str) -> str:
+def _resolve_ai_router_state(ai_router_dir: Path, requested: str) -> str:
     if requested != "auto":
         return requested
-    return "available" if shutil.which(command) else "unavailable"
+    if (ai_router_dir / "bin" / "ai-env").exists():
+        return "available"
+    return "unavailable"
 
 
 def _judge_contract() -> dict[str, Any]:
@@ -159,7 +163,8 @@ def _judge_contract() -> dict[str, Any]:
         "verdict": "ACCEPT|REJECT",
         "required_sections": ["Evidence checked", "Findings", "Suggested action"],
         "rules": [
-            "Return exactly one Verdict line.",
+            "The first line must be exactly `Verdict: ACCEPT` or `Verdict: REJECT`.",
+            "Do not wrap the verdict in a Markdown code fence.",
             "Reject if the packet lacks enough evidence to verify the requested claim.",
             "Reject if any requested validation is missing, stale, or inconsistent.",
             "Reject if the review would require modifying files or using unlisted evidence.",
@@ -181,6 +186,7 @@ def _format_prompt(config: JudgePacketConfig, manifest: dict[str, Any]) -> str:
             f"Preferred runner: {PREFERRED_JUDGE}",
             f"Preferred model: {PREFERRED_MODEL}",
             f"Thinking: {PREFERRED_THINKING}",
+            f"Reasoning effort: {PREFERRED_REASONING_EFFORT}",
             "",
             "You are an independent judge. Inspect only the provided repo files and evidence.",
             (
@@ -215,9 +221,11 @@ def _format_prompt(config: JudgePacketConfig, manifest: dict[str, Any]) -> str:
             "",
             "## Strict Output Schema",
             "",
-            "Return only this Markdown schema:",
+            "Return only these plain Markdown lines.",
+            "Do not wrap the response in a code fence.",
+            "Do not add prose before or after the schema.",
+            "The first line must be exactly `Verdict: ACCEPT` or `Verdict: REJECT`.",
             "",
-            "```md",
             "Verdict: ACCEPT|REJECT",
             "Evidence checked:",
             "- <file, command, or artifact actually inspected>",
@@ -225,7 +233,6 @@ def _format_prompt(config: JudgePacketConfig, manifest: dict[str, Any]) -> str:
             "- <issue, risk, or None.>",
             "Suggested action:",
             "- <next action>",
-            "```",
             "",
             "Reject unless the requested behavior is implemented, the evidence supports it, "
             "and no blocking issue remains.",
@@ -255,20 +262,115 @@ def _format_verdict_template() -> str:
     )
 
 
-def _format_gemini_fallback_command(out_dir: Path) -> str:
-    prompt_path = out_dir / "prompt.md"
+def _format_antigravity_ai_router_command(out_dir: Path, ai_router_dir: Path) -> str:
+    prompt_path = (out_dir / "prompt.md").resolve()
+    verdict_path = (out_dir / "verdict.md").resolve()
+    manifest_path = (out_dir / "evidence_manifest.json").resolve()
+    repo_dir = Path.cwd().resolve()
     return "\n".join(
         [
-            "# Optional read-only fallback when Antigravity is unavailable.",
+            "# Read-only Antigravity judge through local ai-router / CLIProxyAPI.",
+            "# Requires ai-router running on http://127.0.0.1:8317/v1 and Antigravity OAuth login.",
+            "set -euo pipefail",
+            f"cd {shlex.quote(ai_router_dir.as_posix())}",
+            'eval "$(bin/ai-env antigravity)"',
+            f"export MODEL={PREFERRED_MODEL}",
+            f"export REASONING_EFFORT={PREFERRED_REASONING_EFFORT}",
+            f"prompt_path={shlex.quote(prompt_path.as_posix())}",
+            f"manifest_path={shlex.quote(manifest_path.as_posix())}",
+            f"verdict_path={shlex.quote(verdict_path.as_posix())}",
+            f"repo_dir={shlex.quote(repo_dir.as_posix())}",
+            'python - "$prompt_path" "$manifest_path" "$verdict_path" "$repo_dir" <<\'PY\'',
+            "import json",
+            "import os",
+            "import sys",
+            "import urllib.error",
+            "import urllib.request",
+            "from pathlib import Path",
+            "",
+            "prompt_path, manifest_path, verdict_path, repo_dir = sys.argv[1:5]",
+            "repo_dir = Path(repo_dir)",
+            "with open(prompt_path, encoding='utf-8') as file:",
+            "    prompt = file.read()",
+            "with open(manifest_path, encoding='utf-8') as file:",
+            "    manifest = json.load(file)",
+            "",
+            "def file_section(path_text):",
+            "    path = Path(path_text)",
+            "    if not path.is_absolute():",
+            "        path = repo_dir / path",
+            "    try:",
+            "        text = path.read_text(encoding='utf-8')",
+            "    except UnicodeDecodeError:",
+            "        return f'## {path_text}\\n<binary or non-UTF-8 file omitted>\\n'",
+            "    except FileNotFoundError:",
+            "        return f'## {path_text}\\n<MISSING>\\n'",
+            "    max_chars = 60000",
+            "    if len(text) > max_chars:",
+            "        text = text[:max_chars] + '\\n<TRUNCATED>'",
+            "    return f'## {path_text}\\n```\\n{text}\\n```\\n'",
+            "",
+            "sections = [prompt, '\\n# Local Evidence Contents\\n']",
+            "manifest_text = json.dumps(manifest, indent=2)",
+            "manifest_section = '## evidence_manifest.json\\n```json\\n' + manifest_text",
+            "sections.append(manifest_section + '\\n```\\n')",
+            "sections.append('\\n# Changed Files\\n')",
+            "for path_text in manifest.get('changed_files', []):",
+            "    sections.append(file_section(path_text))",
+            "sections.append('\\n# Evidence Files\\n')",
+            "for path_text in manifest.get('evidence', []):",
+            "    sections.append(file_section(path_text))",
+            "full_prompt = '\\n'.join(sections)",
+            "base_payload = {",
+            f"    'model': os.environ.get('MODEL', {PREFERRED_MODEL!r}),",
+            "    'messages': [",
+            "        {",
+            "            'role': 'system',",
+            "            'content': (",
+            "                'You are an independent read-only MiniTFT judge. '",
+            "                'Use the highest available thinking/reasoning setting. '",
+            "                'Return only the requested strict Markdown verdict schema. '",
+            "                'Do not use a Markdown code fence. '",
+            "                'The first response line must be exactly Verdict: ACCEPT '",
+            "                'or Verdict: REJECT.'",
+            "            ),",
+            "        },",
+            "        {'role': 'user', 'content': full_prompt},",
+            "    ],",
+            "}",
+            "base_url = os.environ['OPENAI_BASE_URL'].rstrip('/')",
+            "",
+            "def call_router(payload):",
+            "    request = urllib.request.Request(",
+            "        f'{base_url}/chat/completions',",
+            "        data=json.dumps(payload).encode('utf-8'),",
+            "        headers={",
+            "            'Authorization': f\"Bearer {os.environ['OPENAI_API_KEY']}\",",
+            "            'Content-Type': 'application/json',",
+            "        },",
+            "        method='POST',",
+            "    )",
+            "    with urllib.request.urlopen(request, timeout=300) as response:",
+            "        return json.load(response)",
+            "",
+            "payload = dict(base_payload)",
+            "payload['reasoning_effort'] = os.environ.get('REASONING_EFFORT', 'xhigh')",
+            "try:",
+            "    data = call_router(payload)",
+            "except urllib.error.HTTPError as error:",
+            "    detail = error.read().decode('utf-8', errors='replace')",
+            "    if 'reasoning_effort' not in detail:",
+            "        raise",
+            "    data = call_router(base_payload)",
+            "content = data['choices'][0]['message']['content']",
+            "with open(verdict_path, 'w', encoding='utf-8') as file:",
+            "    file.write(content.rstrip() + '\\n')",
+            "PY",
+            f"cd {shlex.quote(repo_dir.as_posix())}",
             (
-                "# The Gemini CLI option shape was verified with `gemini --help`; "
-                "model access is local."
+                "env -u UV_PYTHON uv run python -m mini_tft.tools.judge_packet "
+                f"--check-verdict {verdict_path.as_posix()}"
             ),
-            "gemini --approval-mode plan "
-            f"--model {GEMINI_FALLBACK_MODEL} "
-            "--output-format text "
-            '--prompt "Run this read-only MiniTFT judge packet. Return only the strict schema." '
-            f"< {prompt_path.as_posix()}",
             "",
         ]
     )
@@ -321,6 +423,12 @@ def _schema_errors(text: str) -> list[str]:
     errors: list[str] = []
     lines = [line.rstrip() for line in text.splitlines()]
     nonempty = [line for line in lines if line.strip()]
+    if not lines:
+        errors.append("verdict file is empty")
+    elif lines[0] not in {"Verdict: ACCEPT", "Verdict: REJECT"}:
+        errors.append(
+            "first line must be exactly `Verdict: ACCEPT` or `Verdict: REJECT`"
+        )
     verdict_lines = [line for line in nonempty if line.startswith("Verdict:")]
     if len(verdict_lines) != 1:
         errors.append("expected exactly one `Verdict:` line")
@@ -386,15 +494,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--evidence", action="append", default=[])
     parser.add_argument("--command", action="append", default=[])
     parser.add_argument(
-        "--antigravity-cli-state",
+        "--ai-router-state",
         choices=("auto", "available", "unavailable"),
         default="auto",
     )
-    parser.add_argument(
-        "--gemini-cli-state",
-        choices=("auto", "available", "unavailable"),
-        default="auto",
-    )
+    parser.add_argument("--ai-router-dir", type=Path, default=AI_ROUTER_DIR)
     parser.add_argument("--check-verdict", type=Path)
     return parser
 
@@ -418,8 +522,8 @@ def main() -> None:
             changed_files=tuple(args.changed_file),
             evidence=tuple(args.evidence),
             validation_commands=tuple(args.command),
-            antigravity_cli_state=args.antigravity_cli_state,
-            gemini_cli_state=args.gemini_cli_state,
+            ai_router_state=args.ai_router_state,
+            ai_router_dir=args.ai_router_dir,
         )
     )
     print(json.dumps(report, indent=2))

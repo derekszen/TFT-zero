@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -19,6 +20,15 @@ from mini_tft.tools.evaluate_strategic_policy import (
 from mini_tft.tools.generate_strategic_muzero_cache import (
     StrategicMuZeroCacheRunConfig,
     run_strategic_muzero_cache_run,
+)
+from mini_tft.tools.judge_packet import (
+    PREFERRED_JUDGE,
+    PREFERRED_MODEL,
+    PREFERRED_REASONING_EFFORT,
+    PREFERRED_THINKING,
+    JudgePacketConfig,
+    check_judge_verdict,
+    generate_judge_packet,
 )
 from mini_tft.tools.strategic_muzero_loop import (
     StrategicMuZeroLoopConfig,
@@ -43,6 +53,8 @@ class StrategicMuZeroRunLoopConfig:
     out_dir: Path = DEFAULT_OUT_DIR
     seed: int = 0
     attempt_cap: int = 3
+    automation_level: str = "L1"
+    wall_clock_limit_minutes: int = 360
     require_queue_ready: bool = True
     cache_episodes: int = 64
     cache_rows: int = 1024
@@ -58,10 +70,14 @@ class StrategicMuZeroRunLoopConfig:
     parity_fuzz_episodes: int = 0
     parity_fuzz_max_steps: int = 80
     cc: str = "cc"
-    codex_allowance_source: str = "user"
-    codex_five_hour_window_remaining: str = "ample"
-    codex_weekly_usage: str = "ample"
-    codex_allowance_decision: str = "continue"
+    codex_allowance_source: str = "unknown"
+    codex_five_hour_window_remaining: str = "unknown"
+    codex_weekly_usage: str = "unknown"
+    codex_allowance_decision: str = "soft-pause"
+    judge_packet_name: str | None = None
+    judge_out_root: Path = Path("artifacts/judge")
+    judge_verdict_path: Path | None = None
+    require_judge_accept: bool = False
 
 
 def run_strategic_muzero_run_loop(
@@ -69,12 +85,7 @@ def run_strategic_muzero_run_loop(
 ) -> dict[str, Any]:
     """Run parity, baselines, cache, train smoke, and the metric verifier."""
 
-    if config.cache_rows <= 0:
-        raise ValueError("cache_rows must be positive")
-    if config.cache_episodes <= 0:
-        raise ValueError("cache_episodes must be positive")
-    if config.baseline_episodes <= 0:
-        raise ValueError("baseline_episodes must be positive")
+    _validate_config(config)
 
     started = perf_counter()
     timestamp = datetime.now(UTC).isoformat()
@@ -145,6 +156,21 @@ def run_strategic_muzero_run_loop(
     )
 
     verifier = _read_json(gate_dir / "verifier" / "metrics.json")
+    attempt_guard = _attempt_guard(config, _next_attempt_number(config.out_dir / "loop-run-log.md"))
+    base_report = _build_report(
+        config=config,
+        timestamp=timestamp,
+        elapsed_sec=perf_counter() - started,
+        parity_report=parity_report,
+        baseline_report=baseline_report,
+        cache_report=cache_report,
+        train_report=train_report,
+        gate_report=gate_report,
+        verifier=verifier,
+        judge_gate={},
+        attempt_guard=attempt_guard,
+    )
+    judge_gate = _judge_gate(config, base_report, verifier)
     report = _build_report(
         config=config,
         timestamp=timestamp,
@@ -155,6 +181,8 @@ def run_strategic_muzero_run_loop(
         train_report=train_report,
         gate_report=gate_report,
         verifier=verifier,
+        judge_gate=judge_gate,
+        attempt_guard=attempt_guard,
     )
     _write_json(config.out_dir / "metrics.json", report)
     (config.out_dir / "decision.md").write_text(_format_decision(report), encoding="utf-8")
@@ -169,8 +197,67 @@ def run_strategic_muzero_run_loop(
         _format_verifier_decision(verifier),
         encoding="utf-8",
     )
-    _write_loop_state(config.out_dir, config, report, verifier, timestamp=timestamp)
+    _write_loop_state(
+        config.out_dir,
+        config,
+        report,
+        verifier,
+        attempt_guard=attempt_guard,
+        timestamp=timestamp,
+    )
+    (config.out_dir / "overnight_goal.md").write_text(
+        _format_overnight_goal(config, report),
+        encoding="utf-8",
+    )
     return report
+
+
+def _validate_config(config: StrategicMuZeroRunLoopConfig) -> None:
+    if config.cache_rows <= 0:
+        raise ValueError("cache_rows must be positive")
+    if config.cache_episodes <= 0:
+        raise ValueError("cache_episodes must be positive")
+    if config.baseline_episodes <= 0:
+        raise ValueError("baseline_episodes must be positive")
+    if config.attempt_cap <= 0:
+        raise ValueError("attempt_cap must be positive")
+    if config.mcts_simulations <= 0:
+        raise ValueError("mcts_simulations must be positive")
+    if config.mcts_max_depth <= 0:
+        raise ValueError("mcts_max_depth must be positive")
+    if config.mcts_rollout_steps <= 0:
+        raise ValueError("mcts_rollout_steps must be positive")
+    if config.train_epochs <= 0:
+        raise ValueError("train_epochs must be positive")
+    if config.train_learning_rate <= 0.0:
+        raise ValueError("train_learning_rate must be positive")
+    if config.wall_clock_limit_minutes <= 0:
+        raise ValueError("wall_clock_limit_minutes must be positive")
+    if config.automation_level not in {"L1", "L2"}:
+        raise ValueError("automation_level must be L1 or L2 for this local harness")
+    if config.codex_allowance_source not in {"/status", "Codex usage dashboard", "unknown"}:
+        raise ValueError(
+            "codex_allowance_source must be /status, Codex usage dashboard, or unknown"
+        )
+    if config.codex_allowance_source == "unknown" and config.codex_allowance_decision == "continue":
+        raise ValueError("unknown codex allowance source cannot use continue decision")
+    if config.codex_allowance_decision == "continue":
+        for label, value in (
+            ("codex_five_hour_window_remaining", config.codex_five_hour_window_remaining),
+            ("codex_weekly_usage", config.codex_weekly_usage),
+        ):
+            normalized = value.strip().lower()
+            is_placeholder = (
+                normalized in {"", "unknown"}
+                or "placeholder" in normalized
+                or "fill-" in normalized
+            )
+            if is_placeholder:
+                raise ValueError(
+                    f"{label} must be a real allowance value when decision is continue"
+                )
+    if config.require_judge_accept and config.judge_verdict_path is None:
+        raise ValueError("require_judge_accept needs judge_verdict_path")
 
 
 def _parity_scenarios(names: tuple[str, ...] | None) -> tuple[Any, ...]:
@@ -190,10 +277,16 @@ def _build_report(
     train_report: Mapping[str, Any],
     gate_report: Mapping[str, Any],
     verifier: Mapping[str, Any],
+    judge_gate: Mapping[str, Any],
+    attempt_guard: Mapping[str, Any],
 ) -> dict[str, Any]:
     gate_metrics = _mapping(gate_report.get("metrics"))
     criteria = _criteria(verifier)
-    status = "pass" if verifier.get("verdict") == "ACCEPT" else str(gate_report.get("status"))
+    status = _status_with_judge(
+        "pass" if verifier.get("verdict") == "ACCEPT" else str(gate_report.get("status")),
+        judge_gate,
+    )
+    status = _status_with_attempt_guard(status, attempt_guard)
     allowance = _allowance_check(config, timestamp)
     return {
         "schema": "strategic-muzero-run-loop/v1",
@@ -206,6 +299,16 @@ def _build_report(
         "metrics": {
             "programmatic_criteria": criteria,
             "codex_allowance_check": allowance,
+            "attempt_guard": dict(attempt_guard),
+            "claim_scope": {
+                "name": "cache_supervised_muzero_style_v0",
+                "not_claiming": [
+                    "full iterative MuZero self-play",
+                    "real TFT rank or patch quality",
+                    "policy quality beyond listed strategic baselines",
+                ],
+            },
+            "antigravity_judge": dict(judge_gate),
             "parity": {
                 "status": parity_report.get("status"),
                 "summary": parity_report.get("summary"),
@@ -244,6 +347,158 @@ def _build_report(
     }
 
 
+def _status_with_judge(status: str, judge_gate: Mapping[str, Any]) -> str:
+    if not judge_gate:
+        return status
+    if bool(judge_gate.get("required")) and not bool(judge_gate.get("accepted")):
+        return "blocked"
+    return status
+
+
+def _status_with_attempt_guard(status: str, attempt_guard: Mapping[str, Any]) -> str:
+    if bool(attempt_guard.get("exceeded")):
+        return "blocked"
+    return status
+
+
+def _attempt_guard(config: StrategicMuZeroRunLoopConfig, attempt: int) -> dict[str, Any]:
+    exceeded = attempt > config.attempt_cap
+    return {
+        "schema": "attempt-guard/v1",
+        "attempt": attempt,
+        "attempt_cap": config.attempt_cap,
+        "exceeded": exceeded,
+        "status": "blocked" if exceeded else "within_cap",
+        "suggested_action": (
+            "attempt cap exceeded; stop this loop and escalate with the current artifacts"
+            if exceeded
+            else "continue"
+        ),
+    }
+
+
+def _judge_gate(
+    config: StrategicMuZeroRunLoopConfig,
+    report: Mapping[str, Any],
+    verifier: Mapping[str, Any],
+) -> dict[str, Any]:
+    if config.judge_packet_name is None and config.judge_verdict_path is None:
+        return {
+            "schema": "antigravity-judge-gate/v1",
+            "status": "not_requested",
+            "required": config.require_judge_accept,
+            "accepted": False,
+            "fail_closed": True,
+            "preferred_runner": PREFERRED_JUDGE,
+            "preferred_model": PREFERRED_MODEL,
+            "thinking": PREFERRED_THINKING,
+            "reasoning_effort": PREFERRED_REASONING_EFFORT,
+        }
+
+    packet_metrics: Mapping[str, Any] | None = None
+    if config.judge_packet_name is not None:
+        packet_metrics = generate_judge_packet(
+            JudgePacketConfig(
+                name=config.judge_packet_name,
+                deliverable="muzero_cache",
+                out_root=config.judge_out_root,
+                objective=(
+                    "Judge whether the strategic cache-supervised MuZero-style V0 "
+                    "loop evidence is complete, correctly labeled, and safe to use "
+                    "for an unattended overnight run."
+                ),
+                summary=(
+                    f"Loop status: {report.get('status')}; verifier: "
+                    f"{verifier.get('verdict')}; cache rows: "
+                    f"{_mapping(_mapping(report.get('metrics')).get('cache')).get('rows', 0)}."
+                ),
+                changed_files=(
+                    "src/mini_tft/tools/strategic_muzero_run_loop.py",
+                    "src/mini_tft/tools/strategic_muzero_loop.py",
+                    "docs/LOOP_SCAFFOLD.md",
+                    "docs/ANTIGRAVITY_JUDGE.md",
+                ),
+                evidence=tuple(_judge_evidence(config)),
+                validation_commands=(
+                    (
+                        "env -u UV_PYTHON uv run pytest -q "
+                        "tests/test_strategic_muzero_run_loop.py "
+                        "tests/test_strategic_muzero_loop.py "
+                        "tests/test_judge_packet.py"
+                    ),
+                    _command(config),
+                ),
+            )
+        )
+
+    verdict_report: Mapping[str, Any] | None = None
+    if config.judge_verdict_path is not None:
+        verdict_report = check_judge_verdict(config.judge_verdict_path)
+
+    accepted = bool(verdict_report and verdict_report.get("accepted"))
+    if accepted:
+        status = "accept"
+    elif config.require_judge_accept:
+        status = "blocked"
+    elif packet_metrics is not None:
+        status = "pending_verdict"
+    else:
+        status = "not_requested"
+
+    return {
+        "schema": "antigravity-judge-gate/v1",
+        "status": status,
+        "required": config.require_judge_accept,
+        "accepted": accepted,
+        "fail_closed": True,
+        "preferred_runner": PREFERRED_JUDGE,
+        "preferred_model": PREFERRED_MODEL,
+        "thinking": PREFERRED_THINKING,
+        "reasoning_effort": PREFERRED_REASONING_EFFORT,
+        "packet": dict(packet_metrics) if packet_metrics is not None else None,
+        "verdict_check": dict(verdict_report) if verdict_report is not None else None,
+        "verdict_path": str(config.judge_verdict_path) if config.judge_verdict_path else None,
+        "suggested_action": _judge_next_action(config, packet_metrics, verdict_report),
+    }
+
+
+def _judge_evidence(config: StrategicMuZeroRunLoopConfig) -> list[str]:
+    out_dir = config.out_dir
+    return [
+        str(out_dir / "metrics.json"),
+        str(out_dir / "decision.md"),
+        str(out_dir / "final_report.md"),
+        str(out_dir / "loop-state.json"),
+        str(out_dir / "loop-run-log.md"),
+        str(out_dir / "verifier" / "metrics.json"),
+        str(out_dir / "gate" / "verifier" / "metrics.json"),
+        str(out_dir / "cache" / "metrics.json"),
+        str(out_dir / "train_smoke" / "metrics.json"),
+        str(out_dir / "policy_eval" / "metrics.json"),
+        str(out_dir / "parity_matrix" / "metrics.json"),
+    ]
+
+
+def _judge_next_action(
+    config: StrategicMuZeroRunLoopConfig,
+    packet_metrics: Mapping[str, Any] | None,
+    verdict_report: Mapping[str, Any] | None,
+) -> str:
+    if verdict_report and verdict_report.get("accepted"):
+        return "external Antigravity judge accepted the packet"
+    if verdict_report:
+        return "fix or override the external judge verdict before promotion"
+    if packet_metrics is not None:
+        out_dir = str(packet_metrics.get("out_dir", "artifacts/judge/<name>"))
+        return (
+            "run the ai-router Antigravity read-only command and save "
+            f"`{out_dir}/verdict.md`"
+        )
+    if config.require_judge_accept:
+        return "provide an accepted Antigravity verdict path"
+    return "optional external judge not requested"
+
+
 def _criteria(verifier: Mapping[str, Any]) -> dict[str, Any]:
     checks = [_criterion(check) for check in _as_list(verifier.get("checks"))]
     failed = [check for check in checks if not check["passed"]]
@@ -270,6 +525,8 @@ def _criterion(check: Any) -> dict[str, Any]:
 def _config_metrics(config: StrategicMuZeroRunLoopConfig) -> dict[str, Any]:
     return {
         "attempt_cap": config.attempt_cap,
+        "automation_level": config.automation_level,
+        "wall_clock_limit_minutes": config.wall_clock_limit_minutes,
         "require_queue_ready": config.require_queue_ready,
         "cache_episodes": config.cache_episodes,
         "cache_rows": config.cache_rows,
@@ -289,6 +546,10 @@ def _config_metrics(config: StrategicMuZeroRunLoopConfig) -> dict[str, Any]:
         "codex_five_hour_window_remaining": config.codex_five_hour_window_remaining,
         "codex_weekly_usage": config.codex_weekly_usage,
         "codex_allowance_decision": config.codex_allowance_decision,
+        "judge_packet_name": config.judge_packet_name,
+        "judge_out_root": str(config.judge_out_root),
+        "judge_verdict_path": str(config.judge_verdict_path) if config.judge_verdict_path else None,
+        "require_judge_accept": config.require_judge_accept,
     }
 
 
@@ -301,6 +562,7 @@ def _artifacts() -> list[str]:
         "loop-run-log.md",
         "verifier/metrics.json",
         "verifier/decision.md",
+        "overnight_goal.md",
         "parity_matrix/metrics.json",
         "parity_matrix/matrix.jsonl",
         "policy_eval/metrics.json",
@@ -322,13 +584,19 @@ def _write_loop_state(
     report: Mapping[str, Any],
     verifier: Mapping[str, Any],
     *,
+    attempt_guard: Mapping[str, Any],
     timestamp: str,
 ) -> None:
     log_path = out_dir / "loop-run-log.md"
-    attempt = _next_attempt_number(log_path)
+    attempt = int(attempt_guard.get("attempt", _next_attempt_number(log_path)))
+    attempt_exceeded = bool(attempt_guard.get("exceeded"))
     allowance = _allowance_check(config, timestamp)
-    next_action = _next_action(verifier, config.codex_allowance_decision)
-    accepted = verifier.get("verdict") == "ACCEPT"
+    next_action = (
+        str(attempt_guard.get("suggested_action"))
+        if attempt_exceeded
+        else _next_action(verifier, config.codex_allowance_decision)
+    )
+    accepted = verifier.get("verdict") == "ACCEPT" and report.get("status") == "pass"
     state = {
         "schema": "loop-state/v1",
         "owner": "mini_tft.tools.strategic_muzero_run_loop",
@@ -350,7 +618,9 @@ def _write_loop_state(
             "baseline comparison is missing",
             "cache rows or MCTS targets fail verifier criteria",
             "train smoke losses are non-finite or checkpoint is missing",
+            "required Antigravity judge verdict is missing, malformed, or REJECT",
             "gate verifier rejects after the attempt cap",
+            f"wall clock exceeds {config.wall_clock_limit_minutes} minutes without progress",
         ],
         "pause_criteria": [
             "Codex allowance status is unknown before starting a new longer loop",
@@ -360,6 +630,7 @@ def _write_loop_state(
             "same blocker persists through the attempt cap",
             "weekly usage is at or above the hard pause threshold",
             "verifier rejects after all concrete fixes have been attempted",
+            "required external judge remains blocked after available evidence is fixed",
         ],
         "validation_commands": [
             "env -u UV_PYTHON uv run python -m mini_tft.tools.strategic_muzero_run_loop --strict",
@@ -417,6 +688,13 @@ def _format_decision(report: Mapping[str, Any]) -> str:
     summary = _mapping(criteria.get("summary"))
     train = _mapping(metrics.get("train_smoke"))
     allowance = _mapping(metrics.get("codex_allowance_check"))
+    judge = _mapping(metrics.get("antigravity_judge"))
+    attempt = _mapping(metrics.get("attempt_guard"))
+    next_action = (
+        str(attempt.get("suggested_action"))
+        if bool(attempt.get("exceeded"))
+        else _next_action(criteria, str(allowance.get("decision", "continue")))
+    )
     return "\n".join(
         [
             "# Strategic MuZero Run Loop Decision",
@@ -431,9 +709,15 @@ def _format_decision(report: Mapping[str, Any]) -> str:
             f"- Train checkpoint: {train.get('checkpoint_path', '')}",
             f"- Parity status: {_mapping(metrics.get('parity')).get('status', 'not_run')}",
             f"- Codex allowance decision: {allowance.get('decision', 'unknown')}",
+            f"- Antigravity judge: {judge.get('status', 'not_requested')}",
+            (
+                "- Attempt guard: "
+                f"{attempt.get('attempt', '?')}/{attempt.get('attempt_cap', '?')} "
+                f"({attempt.get('status', 'unknown')})"
+            ),
             "",
             "Suggested loop action:",
-            f"- {_next_action(criteria, str(allowance.get('decision', 'continue')))}",
+            f"- {next_action}",
             "",
         ]
     )
@@ -449,6 +733,8 @@ def _format_final_report(report: Mapping[str, Any]) -> str:
     baselines = _mapping(metrics.get("baselines"))
     parity = _mapping(metrics.get("parity"))
     allowance = _mapping(metrics.get("codex_allowance_check"))
+    judge = _mapping(metrics.get("antigravity_judge"))
+    attempt = _mapping(metrics.get("attempt_guard"))
     baseline_policies = ", ".join(str(policy) for policy in _as_list(baselines.get("policies")))
     return "\n".join(
         [
@@ -485,6 +771,13 @@ def _format_final_report(report: Mapping[str, Any]) -> str:
                 f"{parity.get('status', 'not_run')} "
                 f"({_mapping(parity.get('summary')).get('passed', 0)}/"
                 f"{_mapping(parity.get('summary')).get('total_checks', 0)})"
+            ),
+            f"- Antigravity judge: {judge.get('status', 'not_requested')}",
+            f"- Antigravity next action: {judge.get('suggested_action', 'none')}",
+            (
+                "- Attempt guard: "
+                f"{attempt.get('attempt', '?')}/{attempt.get('attempt_cap', '?')} "
+                f"({attempt.get('status', 'unknown')})"
             ),
             "",
             "## Failed Criteria",
@@ -560,32 +853,99 @@ def _next_action(
 def _command(config: StrategicMuZeroRunLoopConfig) -> str:
     parts = [
         "env -u UV_PYTHON uv run python -m mini_tft.tools.strategic_muzero_run_loop",
-        f"--out-dir {config.out_dir}",
+        f"--out-dir {_shell(config.out_dir)}",
         f"--seed {config.seed}",
+        f"--attempt-cap {config.attempt_cap}",
+        f"--automation-level {_shell(config.automation_level)}",
+        f"--wall-clock-limit-minutes {config.wall_clock_limit_minutes}",
         f"--cache-episodes {config.cache_episodes}",
         f"--cache-rows {config.cache_rows}",
         f"--mcts-simulations {config.mcts_simulations}",
         f"--mcts-max-depth {config.mcts_max_depth}",
         f"--mcts-rollout-steps {config.mcts_rollout_steps}",
-        f"--mcts-prior-mode {config.mcts_prior_mode}",
+        f"--mcts-prior-mode {_shell(config.mcts_prior_mode)}",
         f"--train-epochs {config.train_epochs}",
         f"--train-learning-rate {config.train_learning_rate}",
         f"--baseline-episodes {config.baseline_episodes}",
-        f"--codex-allowance-source {config.codex_allowance_source}",
-        f"--codex-5h-window-remaining {config.codex_five_hour_window_remaining}",
-        f"--codex-weekly-usage {config.codex_weekly_usage}",
-        f"--codex-allowance-decision {config.codex_allowance_decision}",
+        f"--codex-allowance-source {_shell(config.codex_allowance_source)}",
+        f"--codex-5h-window-remaining {_shell(config.codex_five_hour_window_remaining)}",
+        f"--codex-weekly-usage {_shell(config.codex_weekly_usage)}",
+        f"--codex-allowance-decision {_shell(config.codex_allowance_decision)}",
         *[f"--parity-seed {seed}" for seed in config.parity_seeds],
         "--strict",
     ]
     if config.parity_scenarios:
-        parts.extend(f"--parity-scenario {name}" for name in config.parity_scenarios)
+        parts.extend(f"--parity-scenario {_shell(name)}" for name in config.parity_scenarios)
     if config.parity_fuzz_episodes:
         parts.append(f"--parity-fuzz-episodes {config.parity_fuzz_episodes}")
         parts.append(f"--parity-fuzz-max-steps {config.parity_fuzz_max_steps}")
+    if config.judge_packet_name:
+        parts.append(f"--judge-packet-name {_shell(config.judge_packet_name)}")
+        parts.append(f"--judge-out-root {_shell(config.judge_out_root)}")
+    if config.judge_verdict_path:
+        parts.append(f"--judge-verdict {_shell(config.judge_verdict_path)}")
+    if config.require_judge_accept:
+        parts.append("--require-judge-accept")
     if not config.require_queue_ready:
         parts.append("--allow-smoke-only")
     return " ".join(parts)
+
+
+def _shell(value: object) -> str:
+    return shlex.quote(str(value))
+
+
+def _format_overnight_goal(
+    config: StrategicMuZeroRunLoopConfig,
+    report: Mapping[str, Any],
+) -> str:
+    metrics = _mapping(report.get("metrics"))
+    cache = _mapping(metrics.get("cache"))
+    search = _mapping(metrics.get("search_smoke"))
+    criteria = _mapping(metrics.get("programmatic_criteria"))
+    summary = _mapping(criteria.get("summary"))
+    command = _command(config)
+    return "\n".join(
+        [
+            "# Copy-Paste Overnight Goal",
+            "",
+            "Use this after the short preflight has passed and the external judge path is "
+            "accepted or explicitly waived.",
+            "",
+            "```text",
+            (
+                "/goal Run the strategic cache-supervised MuZero-style V0 overnight "
+                "harness, preserving the 11-action strategic macro surface and all "
+                "unrelated dirty work. Work in a separate clean worktree. Follow "
+                "docs/LOOP_SCAFFOLD.md, docs/QUALITY_GATE.md, and "
+                "docs/ANTIGRAVITY_JUDGE.md. First verify parity, baselines, MCTS-target "
+                "cache rows, train-smoke checkpoint, loop-state, loop-run-log, "
+                "and Antigravity judge packet. Do not call this full "
+                "iterative MuZero; label it cache-supervised MuZero-style V0. Stop only "
+                "when the run is accepted by the programmatic verifier and the judge path "
+                "is accepted/waived, or when a concrete blocker is documented with "
+                "metrics.json, decision.md, final_report.md, loop-state.json, and "
+                "loop-run-log.md."
+            ),
+            "```",
+            "",
+            "## Command",
+            "",
+            "```bash",
+            command,
+            "```",
+            "",
+            "## Preflight Evidence From This Run",
+            "",
+            f"- Status: `{report.get('status')}`",
+            f"- Verifier: `{criteria.get('verdict', 'not_run')}`",
+            f"- Programmatic checks: {summary.get('passed', 0)}/{summary.get('total', 0)}",
+            f"- Cache rows: {cache.get('rows', 0)}",
+            f"- MCTS target rate: {float(cache.get('mcts_target_rate', 0.0)):.6f}",
+            f"- Search decisions/sec: {float(search.get('decisions_per_sec', 0.0)):.2f}",
+            "",
+        ]
+    )
 
 
 def _mapping(value: Any) -> dict[str, Any]:
@@ -619,6 +979,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--attempt-cap", type=int, default=3)
+    parser.add_argument("--automation-level", choices=["L1", "L2"], default="L1")
+    parser.add_argument("--wall-clock-limit-minutes", type=int, default=360)
     parser.add_argument("--allow-smoke-only", action="store_true")
     parser.add_argument("--cache-episodes", type=int, default=64)
     parser.add_argument("--cache-rows", type=int, default=1024)
@@ -634,14 +996,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--parity-fuzz-episodes", type=int, default=0)
     parser.add_argument("--parity-fuzz-max-steps", type=int, default=80)
     parser.add_argument("--cc", default="cc")
-    parser.add_argument("--codex-allowance-source", default="user")
-    parser.add_argument("--codex-5h-window-remaining", default="ample")
-    parser.add_argument("--codex-weekly-usage", default="ample")
+    parser.add_argument(
+        "--codex-allowance-source",
+        choices=["/status", "Codex usage dashboard", "unknown"],
+        default="unknown",
+    )
+    parser.add_argument("--codex-5h-window-remaining", default="unknown")
+    parser.add_argument("--codex-weekly-usage", default="unknown")
     parser.add_argument(
         "--codex-allowance-decision",
         choices=["continue", "soft-pause", "hard-pause"],
-        default="continue",
+        default="soft-pause",
     )
+    parser.add_argument("--judge-packet-name")
+    parser.add_argument("--judge-out-root", type=Path, default=Path("artifacts/judge"))
+    parser.add_argument("--judge-verdict", type=Path)
+    parser.add_argument("--require-judge-accept", action="store_true")
     parser.add_argument("--strict", action="store_true")
     return parser
 
@@ -653,6 +1023,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             out_dir=args.out_dir,
             seed=args.seed,
             attempt_cap=args.attempt_cap,
+            automation_level=args.automation_level,
+            wall_clock_limit_minutes=args.wall_clock_limit_minutes,
             require_queue_ready=not args.allow_smoke_only,
             cache_episodes=args.cache_episodes,
             cache_rows=args.cache_rows,
@@ -672,6 +1044,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             codex_five_hour_window_remaining=args.codex_5h_window_remaining,
             codex_weekly_usage=args.codex_weekly_usage,
             codex_allowance_decision=args.codex_allowance_decision,
+            judge_packet_name=args.judge_packet_name,
+            judge_out_root=args.judge_out_root,
+            judge_verdict_path=args.judge_verdict,
+            require_judge_accept=args.require_judge_accept,
         )
     )
     print(json.dumps(report, indent=2, sort_keys=True))
