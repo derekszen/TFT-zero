@@ -1,67 +1,147 @@
 # TFT-Zero
 
 <p align="center">
-  <img src="Screenshots/tft_2019_board_bench_kym.jpg" alt="Teamfight Tactics board reference" width="900">
+  <img src="https://i.redd.it/7musegquo5kf1.gif" alt="Teamfight Tactics gameplay reference" width="900">
 </p>
 
 TFT-Zero is a compact research scaffold for testing **TFT-shaped strategic
-planning** with fast simulation, legal action masks, Puffer-compatible batched
-rollouts, and simulator-backed MCTS.
+planning** with deterministic simulator rules, legal action masks, fast
+rollouts, PufferLib 4.0 Ocean-style C infrastructure, and simulator-backed
+MCTS.
 
-This repository is the submission landing page. The current report packet is:
+This is not a Riot-accurate TFT clone, a ranked-player claim, a current-patch
+planner, or a completed MuZero system. The active lane is a simplified Markov
+strategic simulator intended for controlled planning and throughput
+experiments.
+
+Current handoff material:
 
 - [Paper/report agent context](artifacts/paper_agent_context/README.md)
+- [Paper draft in OpenAI Prism](https://prism.openai.com/?u=db147769-d04d-4a0c-bd51-3123fc427703&pg=1&m=neurips_2026.tex&d=7)
 
-- [Paper draft](https://prism.openai.com/?u=db147769-d04d-4a0c-bd51-3123fc427703&pg=1&m=neurips_2026.tex&d=7)
+## AI Agent Quick Onboarding
 
-## What This Shows
+Use this section before making claims or queuing new runs.
 
-The active lane is a simplified, Markov, TFT-shaped simulator. It keeps the
-strategic decisions that matter for a small planning experiment: leveling,
-rolling, buying upgrades, fielding strongest board, economy, enemy pressure,
-placement-shaped outcomes, and abstract item slams.
+Read these first:
 
-It is **not** a Riot-accurate TFT clone, a ranked-player claim, a current-patch
-MetaTFT planner, or a completed MuZero system.
+1. [AGENTS.md](AGENTS.md)
+2. [docs/STRATEGIC_LANE.md](docs/STRATEGIC_LANE.md)
+3. [docs/QUALITY_GATE.md](docs/QUALITY_GATE.md)
+4. [docs/TRAINING.md](docs/TRAINING.md)
+5. [artifacts/paper_agent_context/README.md](artifacts/paper_agent_context/README.md)
 
-## Current Results
+Current report evidence in this checkout starts here:
 
-| Result | Evidence | Status |
-| --- | ---: | --- |
-| Legacy Puffer-compatible vector rollout speedup | `11.23x` over scalar strategic stepping | Saved artifact from pre-4.0 wrapper path |
-| Scalar strategic throughput | `15,970` steps/sec | Claim-grade repo artifact |
-| Batched strategic throughput | `179,414` steps/sec | Claim-grade repo artifact |
-| PufferLib 4 Ocean-style standalone env | `~3.8M` steps/sec in commit smoke | Standalone C benchmark, not full trainer |
-| Compiled simulator-backed MCTS throughput | `~0.63M` simulations/sec in main smoke | Native C++ extension |
-| Compiled MCTS speedup vs Python MCTS | about `100x+` on current smoke, `243x-255x` historical matched artifact | Simulator-backed search |
-| MuZero-style cache rows | `128`, legal action rate `1.0` | Smoke artifact |
-| Strategic action space | `11` legal-masked macro actions | Active scaffold |
-| Heuristic calibration | mean placement proxy `7.0`, death rate `1.0` | Harder enemy-pressure setting |
-| Python MCTS smoke | `mcts_32` improves reward/scenario score, not placement | Smoke artifact |
-| PPO strategic native smoke | `128` steps, one update | Wiring only |
+- `artifacts/strategic_lane/muzero_run_loop/metrics.json`
+- `artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked/final_report.md`
+- `artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked/metrics.json`
+- `artifacts/strategic_lane/mcts_native_overnight_20260630T235353/metrics.json`
+- `artifacts/strategic_lane/puffer4_speedup_paper/metrics.json`
 
-The strongest current systems result is the compiled planning backend:
+The requested path
+`artifacts/strategic_lane/muzero_overnight_20260630T174428Z` was not present
+when this README was refreshed. The available full-MuZero overnight launch
+evidence is
+`artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked`, which
+passed preflight but stopped because no production/full strategic MuZero trainer
+entry point exists yet.
 
-```text
-Python MCTS smoke:   ~4.3k-4.6k simulations/sec
-Native MCTS smoke:   ~0.63M simulations/sec
-Historical matched:  ~243x-255x speedup
+Queue a scaffolded MuZero-readiness run:
+
+```bash
+RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
+OUT="artifacts/strategic_lane/muzero_run_loop_${RUN_ID}"
+
+env -u UV_PYTHON uv run python -m mini_tft.tools.strategic_muzero_run_loop \
+  --out-dir "$OUT" \
+  --seed 1000 \
+  --cache-episodes 64 \
+  --cache-rows 1024 \
+  --mcts-simulations 16 \
+  --mcts-max-depth 10 \
+  --mcts-rollout-steps 6 \
+  --mcts-prior-mode heuristic \
+  --train-epochs 24 \
+  --train-learning-rate 0.03 \
+  --baseline-episodes 32 \
+  --codex-allowance-source user \
+  --codex-5h-window-remaining ample \
+  --codex-weekly-usage ample \
+  --codex-allowance-decision continue \
+  --parity-seed 0 \
+  --parity-seed 1 \
+  --parity-seed 7 \
+  --parity-seed 19 \
+  --strict
 ```
 
-The strongest saved rollout artifact from the legacy Puffer-compatible vector
-path is:
+This regenerates the cache, Python MCTS targets, tiny linear train smoke,
+baseline eval, parity matrix, quality gate, and verifier. It is a readiness
+run, not production MuZero training.
 
-```text
-Scalar strategic step path:   15,970 steps/sec
-Batched native-vector path:   179,414 steps/sec
-Speedup:                     11.23x
-Semantic parity:             true
-Decision:                    pass
+Queue a scaffolded PufferLib 4.0 Ocean C speed smoke:
+
+```bash
+RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
+OUT="artifacts/strategic_lane/puffer4_ocean_${RUN_ID}"
+
+env -u UV_PYTHON uv run python -m mini_tft.tools.benchmark_puffer4_ocean \
+  --out-dir "$OUT" \
+  --envs 4096 \
+  --steps 10000000
 ```
 
-The current dependency pin is PufferLib 4.0, where the old
-`pufferlib.PufferEnv`/`pufferlib.emulation` wrapper API is gone. New live Puffer
-work should use the Ocean-style C scaffold and benchmark command below.
+The saved CUDA trainer smoke was run from a PufferLib 4.0 checkout, not from
+the repo root:
+
+```bash
+cd /tmp/PufferLib-4.0
+env -u UV_PYTHON uv run --all-extras python -m pufferlib.pufferl train strategic_tft \
+  --train.total-timesteps 262144 \
+  --checkpoint-dir /mnt/ssd2/Projects/TFT-zero/artifacts/strategic_lane/puffer4_train_smoke/checkpoints \
+  --log-dir /mnt/ssd2/Projects/TFT-zero/artifacts/strategic_lane/puffer4_train_smoke/logs \
+  --checkpoint-interval 1000000000
+```
+
+When updating results for a paper-writing agent:
+
+1. Treat `metrics.json`, `final_report.md`, and `decision.md` as source
+   evidence, not memory.
+2. Update both this README and
+   `artifacts/paper_agent_context/README.md` with exact paths, dates, statuses,
+   row counts, speeds, loss deltas, and verifier verdicts.
+3. Preserve labels such as `smoke_only`, `blocked`, and `pass`; do not promote
+   a result beyond its artifact status.
+4. For MuZero evidence, always say whether the model is the tiny train smoke or
+   a full recurrent learned MuZero trainer. The current full trainer is
+   missing.
+5. Run `git diff --check README.md artifacts/paper_agent_context/README.md`
+   after documentation edits.
+
+## Latest Evidence
+
+As of 2026-07-01, the strongest current evidence is:
+
+| Lane | Main artifact | Key result | Status |
+| --- | --- | --- | --- |
+| PufferLib 4.0 C/Ocean and CUDA trainer smoke | `artifacts/strategic_lane/puffer4_speedup_paper/metrics.json` | Python scalar `25,259.39` steps/s; Ocean C standalone `3,755,013.36` steps/s (`148.66x`); CUDA trainer smoke `9,017,194` agent steps/s (`356.98x`) | `smoke_only` |
+| MuZero-readiness loop | `artifacts/strategic_lane/muzero_run_loop/metrics.json` | `1024` cache rows, obs/action shape `38 x 11`, legal action rate `1.0`, MCTS target rate `1.0`, verifier `ACCEPT` with `21/21` checks | `pass` for readiness |
+| Tiny train smoke over MuZero-style cache | `artifacts/strategic_lane/muzero_run_loop/train_smoke/metrics.json` | total loss `4.892351 -> 2.340075`, policy loss `2.396928 -> 2.043442`, value loss `2.372969 -> 0.200895`, dynamics loss `0.122454 -> 0.095737` | `smoke_only` |
+| Full strategic MuZero overnight launch | `artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked/metrics.json` | preflight passed with verifier `ACCEPT`, but launch blocked because no production/full strategic MuZero trainer entry point exists | `blocked` |
+| Native simulator-backed MCTS overnight | `artifacts/strategic_lane/mcts_native_overnight_20260630T235353/metrics.json` | `65,536` episodes/policy; best reward and scenario score from `mcts_1024`; `mcts_1024` reward `-1.339` vs heuristic `-2.187`; `446,638` simulations/s at 1024 sims | `smoke_only` |
+| Python simulator-backed MCTS overnight | `artifacts/strategic_lane/mcts_overnight_20260630T203555/metrics.json` | `1,024` episodes/policy; best placement from `mcts_64`; best reward and scenario score from `mcts_256` | `smoke_only` |
+
+Current claim-safe reading:
+
+- PufferLib 4.0 infrastructure can compile and produce high-throughput smoke
+  results for the strategic C/Ocean environment.
+- The MuZero-readiness loop can generate deterministic cache/search/train-smoke
+  artifacts with legal masks, policy targets, value targets, parity evidence,
+  and verifier acceptance.
+- Native simulator-backed MCTS improves reward and scenario score in the latest
+  overnight run, but not the placement proxy.
+- No final production MuZero trainer has been launched.
 
 ## Main Artifacts
 
@@ -71,27 +151,46 @@ Paper/report handoff:
 artifacts/paper_agent_context/README.md
 ```
 
-Strategic lane summary:
+Latest MuZero-readiness loop:
 
 ```text
-artifacts/strategic_lane/metrics.json
-artifacts/strategic_lane/final_report.md
-artifacts/strategic_lane/decision.md
+artifacts/strategic_lane/muzero_run_loop/metrics.json
+artifacts/strategic_lane/muzero_run_loop/final_report.md
+artifacts/strategic_lane/muzero_run_loop/decision.md
+artifacts/strategic_lane/muzero_run_loop/cache/rows.jsonl
+artifacts/strategic_lane/muzero_run_loop/train_smoke/train_smoke.npz
+artifacts/strategic_lane/muzero_run_loop/verifier/metrics.json
 ```
 
-Puffer-compatible speed evidence:
+Blocked full-MuZero overnight launch:
 
 ```text
-artifacts/strategic_lane/puffer_speed/metrics.json
-artifacts/strategic_lane/puffer_speed/decision.md
+artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked/metrics.json
+artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked/final_report.md
+artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked/decision.md
+artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked/verifier/metrics.json
 ```
 
-MuZero-style cache smoke:
+Native MCTS overnight:
 
 ```text
-artifacts/strategic_lane/muzero_cache/rows.jsonl
-artifacts/strategic_lane/muzero_cache/metrics.json
-artifacts/strategic_lane/muzero_cache/decision.md
+artifacts/strategic_lane/mcts_native_overnight_20260630T235353/metrics.json
+artifacts/strategic_lane/mcts_native_overnight_20260630T235353/paper_table.md
+artifacts/strategic_lane/mcts_native_overnight_20260630T235353/episodes.jsonl
+artifacts/strategic_lane/mcts_native_overnight_20260630T235353/decisions.jsonl
+artifacts/strategic_lane/mcts_native_overnight_20260630T235353/command.txt
+```
+
+PufferLib 4.0 speed smoke:
+
+```text
+artifacts/strategic_lane/puffer4_speedup_paper/metrics.json
+artifacts/strategic_lane/puffer4_speedup_paper/final_report.md
+artifacts/strategic_lane/puffer4_speedup_paper/decision.md
+artifacts/strategic_lane/puffer4_train_smoke/
+artifacts/strategic_lane/puffer4_ocean/
+artifacts/strategic_lane/puffer4_ocean_after_rng_fix/
+artifacts/strategic_lane/puffer4_ocean_commit_smoke/
 ```
 
 Playable payload smoke:
@@ -102,29 +201,8 @@ artifacts/strategic_lane/playable_demo/metrics.json
 artifacts/strategic_lane/playable_demo/decision.md
 ```
 
-PPO smoke:
-
-```text
-artifacts/strategic_lane/ppo_smoke/strategic_native_puffer_smoke.pt
-artifacts/strategic_lane/ppo_smoke/strategic_native_puffer_smoke.manifest.json
-```
-
-Python simulator-backed MCTS smoke:
-
-```text
-artifacts/strategic_lane/mcts_smoke/metrics.json
-artifacts/strategic_lane/mcts_smoke/paper_table.md
-artifacts/strategic_lane/mcts_smoke/episodes.jsonl
-artifacts/strategic_lane/mcts_smoke/decisions.jsonl
-```
-
-Compiled simulator-backed MCTS artifacts:
-
-```text
-artifacts/strategic_lane/mcts_native_smoke/
-/mnt/ssd2/Projects/TFT-zero-compiled-strategic-mcts/artifacts/strategic_lane/mcts_native_benchmark/
-/mnt/ssd2/Projects/TFT-zero-compiled-strategic-mcts/artifacts/strategic_lane/mcts_python_matched_smoke/
-```
+Older artifacts under `docs/archive/` and older strategic-lane artifact
+directories are historical unless explicitly rerun.
 
 ## Code Map
 
@@ -137,75 +215,18 @@ src/mini_tft/strategic/core/rules.py
 src/mini_tft/strategic/core/obs.py
 ```
 
-Adapters:
+Strategic adapters:
 
 ```text
 src/mini_tft/strategic/adapters/baselines/policies.py
+src/mini_tft/strategic/adapters/mcts.py
+src/mini_tft/strategic/adapters/muzero_cache/export.py
 src/mini_tft/strategic/adapters/puffer/vector_env.py
 src/mini_tft/strategic/adapters/puffer/benchmark.py
-src/mini_tft/strategic/adapters/muzero_cache/export.py
 src/mini_tft/strategic/adapters/web_demo/payload.py
-src/mini_tft/strategic/adapters/mcts.py
 ```
 
-Training and CLI surfaces:
-
-```text
-src/mini_tft/rl/puffer_env.py
-src/mini_tft/rl/train_puffer_ppo.py
-src/mini_tft/tools/strategic_lane_gate.py
-src/mini_tft/tools/strategic_mcts_smoke.py
-```
-
-## Reproduce Current Repo Evidence
-
-Use `env -u UV_PYTHON uv run ...` for repo commands.
-
-```bash
-uv sync
-env -u UV_PYTHON uv run pytest
-env -u UV_PYTHON uv run ruff check
-env -u UV_PYTHON uv run --all-extras pyright
-```
-
-Strategic lane gate:
-
-```bash
-env -u UV_PYTHON uv run python -m mini_tft.tools.strategic_lane_gate
-```
-
-Python MCTS smoke:
-
-```bash
-env -u UV_PYTHON uv run python -m mini_tft.tools.strategic_mcts_smoke \
-  --out-dir artifacts/strategic_lane/mcts_smoke \
-  --episodes 8 --simulations 8 16 32 \
-  --max-depth 8 --rollout-steps 6 \
-  --prior-mode heuristic --seed 9100
-```
-
-PufferLib 4 Ocean-style standalone smoke:
-
-```bash
-env -u UV_PYTHON uv run python -m mini_tft.tools.benchmark_puffer4_ocean \
-  --envs 512 --steps 100000 \
-  --out-dir artifacts/strategic_lane/puffer4_ocean_commit_smoke
-```
-
-Legacy native strategic Puffer PPO smoke requires a PufferLib version that still
-exports `pufferlib.PufferEnv` and `pufferlib.emulation`. The saved artifact is:
-
-```text
-artifacts/strategic_lane/ppo_smoke/strategic_native_puffer_smoke.manifest.json
-```
-
-## PufferLib 4.0 Route
-
-The current repo is pinned to PufferLib 4.0. The old
-`PufferEnv`/emulation-compatible surface is no longer available, so the minimal
-4.0 route is the Ocean/C scaffold copied from `ocean/squared`.
-
-This repo now contains a standalone strategic Ocean-style scaffold:
+PufferLib 4.0 Ocean-style C scaffold:
 
 ```text
 src/mini_tft/strategic/ocean/strategic_tft.h
@@ -215,7 +236,71 @@ config/strategic_tft.ini
 src/mini_tft/tools/benchmark_puffer4_ocean.py
 ```
 
-To build inside a full PufferLib 4.0 checkout:
+MuZero-readiness, MCTS, and gate tools:
+
+```text
+src/mini_tft/tools/generate_strategic_muzero_cache.py
+src/mini_tft/tools/train_strategic_muzero_smoke.py
+src/mini_tft/tools/strategic_muzero_loop.py
+src/mini_tft/tools/strategic_muzero_run_loop.py
+src/mini_tft/tools/strategic_mcts_smoke.py
+src/mini_tft/tools/strategic_parity_matrix.py
+src/mini_tft/tools/strategic_lane_gate.py
+src/mini_tft/tools/judge_packet.py
+```
+
+Legacy Puffer wrapper/training entry points, for historical comparison only:
+
+```text
+src/mini_tft/rl/puffer_env.py
+src/mini_tft/rl/train_puffer_ppo.py
+```
+
+## Reproduce Current Evidence
+
+Use `env -u UV_PYTHON uv run ...` for repo commands.
+
+Install and basic checks:
+
+```bash
+uv sync
+env -u UV_PYTHON uv run pytest
+env -u UV_PYTHON uv run ruff check
+env -u UV_PYTHON uv run --all-extras pyright
+git diff --check
+```
+
+Strategic lane gate:
+
+```bash
+env -u UV_PYTHON uv run python -m mini_tft.tools.strategic_lane_gate
+```
+
+Native MCTS overnight command used for the latest artifact:
+
+```bash
+env -u UV_PYTHON uv run python -m mini_tft.tools.strategic_mcts_smoke \
+  --backend native \
+  --out-dir artifacts/strategic_lane/mcts_native_overnight_20260630T235353 \
+  --episodes 65536 \
+  --simulations 64 128 256 512 1024 \
+  --max-depth 10 \
+  --rollout-steps 8 \
+  --prior-mode heuristic \
+  --seed 9500 \
+  --strict
+```
+
+PufferLib 4.0 Ocean standalone smoke:
+
+```bash
+env -u UV_PYTHON uv run python -m mini_tft.tools.benchmark_puffer4_ocean \
+  --out-dir artifacts/strategic_lane/puffer4_ocean_commit_smoke \
+  --envs 512 \
+  --steps 100000
+```
+
+Build the strategic env inside a full PufferLib 4.0 checkout:
 
 ```bash
 git clone --branch 4.0 https://github.com/PufferAI/PufferLib.git ../TFT-zero-puffer4
@@ -228,24 +313,18 @@ bash build.sh strategic_tft --local
 ```
 
 Use the Python strategic simulator as the parity oracle before reporting any
-full PufferLib 4.0 trainer numbers.
+new PufferLib 4.0 trainer number.
 
-## Active Docs
-
-- [Agent Notes](AGENTS.md): current rules for coding agents.
-- [Architecture](docs/ARCHITECTURE.md): compact system map.
-- [Strategic Lane](docs/STRATEGIC_LANE.md): clean simulator lane and deliverables.
-- [Loop Scaffold](docs/LOOP_SCAFFOLD.md): repeatable autonomous loop contract.
-- [Quality Gate](docs/QUALITY_GATE.md): deterministic verification criteria.
-- [Training](docs/TRAINING.md): minimal PPO/Puffer/MuZero command surfaces.
-- [Archive Index](docs/ARCHIVE_INDEX.md): where old runbooks and reports moved.
-
-## Claim Rules
+## Claim Boundaries
 
 - Toy and strategic-lane results are simplified simulator results.
 - `placement_proxy` is an elimination-timing bucket, not real TFT placement.
-- Puffer-compatible speed is rollout-throughput evidence, not policy-quality
-  evidence.
-- Compiled MCTS speed is simulator-backed search throughput, not MuZero.
-- MuZero claims require learned dynamics, model-backed search, legal masks,
-  auditable cache rows, and deterministic baseline comparisons.
+- Puffer speed evidence is rollout/trainer-throughput evidence, not policy
+  quality evidence.
+- Native MCTS is simulator-backed search over the strategic rules, not learned
+  MuZero dynamics.
+- The current MuZero train step is a tiny linear policy/value/dynamics smoke,
+  not full learned recurrent MuZero plus search training.
+- Full MuZero claims require a production trainer entry point, model-backed
+  search, legal masks, auditable cache rows, deterministic seeds, and baseline
+  comparisons under [docs/QUALITY_GATE.md](docs/QUALITY_GATE.md).
