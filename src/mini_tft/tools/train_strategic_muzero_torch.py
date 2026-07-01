@@ -303,32 +303,139 @@ def run_torch_checkpoint_policy_evaluation(
 
 
 _StrategicPolicy = Callable[[Any, NDArray[np.bool_], StrategicConfig], int]
+_StrategicPolicyValue = Callable[
+    [Any, NDArray[np.bool_], StrategicConfig],
+    tuple[NDArray[np.float32], float],
+]
+_CHECKPOINT_SCHEMA = "strategic-muzero-torch-checkpoint/v1"
+_REQUIRED_CHECKPOINT_METADATA = ("observation_dim", "action_dim", "hidden_size")
 
 
-def load_torch_muzero_policy(checkpoint_path: Path, *, device: str = "cpu") -> _StrategicPolicy:
+def load_torch_muzero_policy_value(
+    checkpoint_path: Path,
+    *,
+    device: str = "cpu",
+) -> _StrategicPolicyValue:
     resolved_device = _resolve_device(device)
-    checkpoint = torch.load(checkpoint_path, map_location=resolved_device, weights_only=False)
-    metadata = dict(checkpoint["metadata"])
+    metadata, model_state_dict = _load_torch_checkpoint_payload(
+        checkpoint_path,
+        device=resolved_device,
+    )
+    observation_dim = _checkpoint_metadata_int(metadata, "observation_dim")
+    action_dim = _checkpoint_metadata_int(metadata, "action_dim")
+    hidden_size = _checkpoint_metadata_int(metadata, "hidden_size")
     model = StrategicMuZeroTorchNet(
-        observation_dim=int(metadata["observation_dim"]),
-        action_dim=int(metadata["action_dim"]),
-        hidden_size=int(metadata["hidden_size"]),
+        observation_dim=observation_dim,
+        action_dim=action_dim,
+        hidden_size=hidden_size,
     ).to(resolved_device)
-    model.load_state_dict(checkpoint["model_state_dict"])
+    try:
+        model.load_state_dict(model_state_dict)
+    except RuntimeError as exc:
+        raise ValueError(
+            "checkpoint model weights do not match checkpoint metadata: "
+            f"{checkpoint_path}"
+        ) from exc
     model.eval()
+    cache: dict[tuple[bytes, bytes], tuple[NDArray[np.float32], float]] = {}
 
-    def policy(state: Any, mask: NDArray[np.bool_], config: StrategicConfig) -> int:
-        del config
+    def policy_value(
+        state: Any,
+        mask: NDArray[np.bool_],
+        config: StrategicConfig,
+    ) -> tuple[NDArray[np.float32], float]:
+        obs_array = np.asarray(observe(state, config), dtype=np.float32)
+        if obs_array.ndim != 1 or obs_array.shape[0] != model.observation_dim:
+            raise ValueError(
+                "state observation shape does not match checkpoint metadata: "
+                f"expected {(model.observation_dim,)}, got {obs_array.shape}"
+            )
+        mask_array = np.asarray(mask, dtype=np.bool_)
+        if mask_array.ndim != 1 or mask_array.shape[0] != model.action_dim:
+            raise ValueError(
+                "legal mask shape does not match checkpoint metadata: "
+                f"expected {(model.action_dim,)}, got {mask_array.shape}"
+            )
+        cache_key = (obs_array.tobytes(), mask_array.tobytes())
+        cached = cache.get(cache_key)
+        if cached is not None:
+            priors, value = cached
+            return priors.copy(), value
         obs = torch.as_tensor(
-            observe(state),
+            obs_array,
             dtype=torch.float32,
             device=resolved_device,
         ).unsqueeze(0)
-        mask_tensor = torch.as_tensor(mask, dtype=torch.bool, device=resolved_device)
+        mask_tensor = torch.as_tensor(mask_array, dtype=torch.bool, device=resolved_device)
         with torch.no_grad():
-            logits = model.policy_logits(obs).squeeze(0)
+            hidden = model.representation(obs)
+            logits = model.policy_head(hidden).squeeze(0)
+            value = float(model.value_head(hidden).squeeze().detach().cpu().item())
+            if not bool(mask_tensor.any()):
+                empty_priors = np.zeros(mask_array.shape, dtype=np.float32)
+                cache[cache_key] = (empty_priors.copy(), value)
+                return empty_priors, value
             logits = logits.masked_fill(~mask_tensor, -1.0e9)
-            action = int(torch.argmax(logits).item())
+            priors = torch.softmax(logits, dim=-1)
+            priors = priors.masked_fill(~mask_tensor, 0.0)
+            total = priors.sum()
+            if not bool(torch.isfinite(total)) or float(total.detach().cpu().item()) <= 0.0:
+                raise RuntimeError("checkpoint policy produced no legal probability mass")
+            priors = priors / total
+        priors_array = priors.detach().cpu().numpy().astype(np.float32)
+        cache[cache_key] = (priors_array.copy(), value)
+        return priors_array, value
+
+    return policy_value
+
+
+def _load_torch_checkpoint_payload(
+    checkpoint_path: Path,
+    *,
+    device: torch.device,
+) -> tuple[dict[str, Any], Mapping[str, Any]]:
+    try:
+        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    except Exception as exc:
+        raise ValueError(f"failed to load strategic MuZero checkpoint: {checkpoint_path}") from exc
+    if not isinstance(checkpoint, Mapping):
+        raise ValueError(f"invalid strategic MuZero checkpoint payload: {checkpoint_path}")
+    if checkpoint.get("schema") != _CHECKPOINT_SCHEMA:
+        raise ValueError(
+            "invalid strategic MuZero checkpoint schema: "
+            f"{checkpoint.get('schema')!r} in {checkpoint_path}"
+        )
+    metadata = checkpoint.get("metadata")
+    if not isinstance(metadata, Mapping):
+        raise ValueError(f"invalid strategic MuZero checkpoint metadata: {checkpoint_path}")
+    missing = [key for key in _REQUIRED_CHECKPOINT_METADATA if key not in metadata]
+    if missing:
+        raise ValueError(
+            "strategic MuZero checkpoint metadata missing required fields: "
+            f"{', '.join(missing)}"
+        )
+    model_state_dict = checkpoint.get("model_state_dict")
+    if not isinstance(model_state_dict, Mapping):
+        raise ValueError(f"invalid strategic MuZero checkpoint model_state_dict: {checkpoint_path}")
+    return dict(metadata), model_state_dict
+
+
+def _checkpoint_metadata_int(metadata: Mapping[str, Any], key: str) -> int:
+    try:
+        value = int(metadata[key])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(f"invalid strategic MuZero checkpoint metadata field: {key}") from exc
+    if value <= 0:
+        raise ValueError(f"checkpoint metadata field must be positive: {key}")
+    return value
+
+
+def load_torch_muzero_policy(checkpoint_path: Path, *, device: str = "cpu") -> _StrategicPolicy:
+    policy_value = load_torch_muzero_policy_value(checkpoint_path, device=device)
+
+    def policy(state: Any, mask: NDArray[np.bool_], config: StrategicConfig) -> int:
+        priors, _ = policy_value(state, mask, config)
+        action = int(np.argmax(priors))
         return action
 
     return policy

@@ -35,6 +35,9 @@ class StrategicMuZeroCacheRunConfig:
     max_depth: int = 10
     rollout_steps: int = 6
     prior_mode: str = "heuristic"
+    value_mode: str = "heuristic"
+    checkpoint_path: Path | None = None
+    checkpoint_device: str = "cpu"
     determinism_check: bool = True
 
 
@@ -49,14 +52,35 @@ def run_strategic_muzero_cache_run(
         raise ValueError("simulations must be positive")
     if config.backend not in {"auto", "python", "native"}:
         raise ValueError("backend must be one of: auto, python, native")
+    if config.prior_mode not in {"uniform", "heuristic", "checkpoint"}:
+        raise ValueError("prior_mode must be one of: uniform, heuristic, checkpoint")
+    if config.value_mode not in {"heuristic", "checkpoint"}:
+        raise ValueError("value_mode must be one of: heuristic, checkpoint")
+    checkpoint_guided = config.prior_mode == "checkpoint" or config.value_mode == "checkpoint"
+    if checkpoint_guided:
+        if config.checkpoint_path is None:
+            raise ValueError("checkpoint-guided MCTS requires checkpoint_path")
+        if not config.checkpoint_path.exists():
+            raise ValueError(f"checkpoint does not exist: {config.checkpoint_path}")
     config.out_dir.mkdir(parents=True, exist_ok=True)
 
     started = perf_counter()
+    checkpoint_evaluator = None
+    if checkpoint_guided and config.checkpoint_path is not None:
+        from mini_tft.tools.train_strategic_muzero_torch import load_torch_muzero_policy_value
+
+        checkpoint_evaluator = load_torch_muzero_policy_value(
+            config.checkpoint_path,
+            device=config.checkpoint_device,
+        )
     mcts_config = StrategicMCTSConfig(
         simulations=config.simulations,
         max_depth=config.max_depth,
         rollout_steps=config.rollout_steps,
         prior_mode=config.prior_mode,
+        value_mode=config.value_mode,
+        checkpoint_path=str(config.checkpoint_path) if config.checkpoint_path else None,
+        checkpoint_evaluator=checkpoint_evaluator,
     )
     rows, backend_used, fallback_reason = _generate_rows(config, mcts_config)
     elapsed_sec = perf_counter() - started
@@ -75,6 +99,9 @@ def run_strategic_muzero_cache_run(
                 max_depth=config.max_depth,
                 rollout_steps=config.rollout_steps,
                 prior_mode=config.prior_mode,
+                value_mode=config.value_mode,
+                checkpoint_path=config.checkpoint_path,
+                checkpoint_device=config.checkpoint_device,
                 determinism_check=False,
             ),
             mcts_config,
@@ -100,6 +127,10 @@ def run_strategic_muzero_cache_run(
                 "total_decisions": len(rows),
                 "illegal_action_count": _illegal_action_count(rows),
                 "simulations": config.simulations,
+                "prior_mode": config.prior_mode,
+                "value_mode": config.value_mode,
+                "checkpoint_path": str(config.checkpoint_path) if config.checkpoint_path else None,
+                "checkpoint_device": config.checkpoint_device if checkpoint_guided else None,
                 "elapsed_sec": elapsed_sec,
                 "decisions_per_sec": len(rows) / elapsed_sec if elapsed_sec > 0.0 else 0.0,
             },
@@ -116,6 +147,9 @@ def run_strategic_muzero_cache_run(
                 "max_depth": config.max_depth,
                 "rollout_steps": config.rollout_steps,
                 "prior_mode": config.prior_mode,
+                "value_mode": config.value_mode,
+                "checkpoint_path": str(config.checkpoint_path) if config.checkpoint_path else None,
+                "checkpoint_device": config.checkpoint_device,
                 "determinism_check": config.determinism_check,
             },
         },
@@ -136,24 +170,29 @@ def _generate_rows(
     mcts_config: StrategicMCTSConfig,
 ) -> tuple[list[CacheRow], str, str | None]:
     if config.backend in {"auto", "native"}:
-        try:
-            return (
-                _generate_native_mcts_cache(
-                    episodes=config.episodes,
-                    max_rows=config.max_rows,
-                    seed=config.seed,
-                    simulations=config.simulations,
-                    max_depth=config.max_depth,
-                    rollout_steps=config.rollout_steps,
-                    prior_mode=config.prior_mode,
-                ),
-                "native",
-                None,
-            )
-        except (ImportError, RuntimeError, ValueError) as exc:
+        if config.prior_mode == "checkpoint" or config.value_mode == "checkpoint":
             if config.backend == "native":
-                raise
-            fallback_reason = str(exc)
+                raise ValueError("native backend does not support checkpoint-guided MCTS")
+            fallback_reason = "checkpoint-guided MCTS requires python backend"
+        else:
+            try:
+                return (
+                    _generate_native_mcts_cache(
+                        episodes=config.episodes,
+                        max_rows=config.max_rows,
+                        seed=config.seed,
+                        simulations=config.simulations,
+                        max_depth=config.max_depth,
+                        rollout_steps=config.rollout_steps,
+                        prior_mode=config.prior_mode,
+                    ),
+                    "native",
+                    None,
+                )
+            except (ImportError, RuntimeError, ValueError) as exc:
+                if config.backend == "native":
+                    raise
+                fallback_reason = str(exc)
     else:
         fallback_reason = None
 
@@ -363,6 +402,9 @@ def _format_decision(report: Mapping[str, Any]) -> str:
             f"- Policy target valid rate: {cache['policy_target_valid_rate']:.6f}",
             f"- Value target finite rate: {cache['value_target_finite_rate']:.6f}",
             f"- Decisions/sec: {search['decisions_per_sec']:.2f}",
+            f"- Prior mode: {search['prior_mode']}",
+            f"- Value mode: {search['value_mode']}",
+            f"- Checkpoint: {search['checkpoint_path']}",
             f"- Fixed-seed reproducible: {determinism['fixed_seed_reproducible']}",
             "",
             "Limits:",
@@ -386,7 +428,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--simulations", type=int, default=16)
     parser.add_argument("--max-depth", type=int, default=10)
     parser.add_argument("--rollout-steps", type=int, default=6)
-    parser.add_argument("--prior-mode", choices=["uniform", "heuristic"], default="heuristic")
+    parser.add_argument(
+        "--prior-mode",
+        choices=["uniform", "heuristic", "checkpoint"],
+        default="heuristic",
+    )
+    parser.add_argument("--value-mode", choices=["heuristic", "checkpoint"], default="heuristic")
+    parser.add_argument("--checkpoint", type=Path)
+    parser.add_argument("--checkpoint-device", default="cpu")
     parser.add_argument("--skip-determinism-check", action="store_true")
     parser.add_argument("--strict", action="store_true")
     return parser
@@ -405,6 +454,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             max_depth=args.max_depth,
             rollout_steps=args.rollout_steps,
             prior_mode=args.prior_mode,
+            value_mode=args.value_mode,
+            checkpoint_path=args.checkpoint,
+            checkpoint_device=args.checkpoint_device,
             determinism_check=not args.skip_determinism_check,
         )
     )

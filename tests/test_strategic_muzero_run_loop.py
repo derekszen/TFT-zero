@@ -124,27 +124,34 @@ def test_strategic_muzero_run_loop_blocks_after_attempt_cap(tmp_path) -> None:
     assert "attempt cap exceeded" in state["current_next_action"]
 
 
-def test_strategic_muzero_run_loop_rejects_unknown_allowance_continue(tmp_path) -> None:
-    with pytest.raises(ValueError, match="unknown codex allowance source cannot use continue"):
-        run_strategic_muzero_run_loop(
-            StrategicMuZeroRunLoopConfig(
-                out_dir=tmp_path,
-                codex_allowance_source="unknown",
-                codex_allowance_decision="continue",
-            )
-        )
+def test_strategic_muzero_run_loop_allows_user_waived_launch_metadata(tmp_path) -> None:
+    if shutil.which("cc") is None:
+        pytest.skip("C compiler is not available")
 
-
-def test_strategic_muzero_run_loop_rejects_placeholder_allowance_continue(
-    tmp_path,
-) -> None:
-    with pytest.raises(ValueError, match="real allowance value"):
-        run_strategic_muzero_run_loop(
-            StrategicMuZeroRunLoopConfig(
-                out_dir=tmp_path,
-                codex_allowance_source="/status",
-                codex_five_hour_window_remaining="<fill-from-status-or-waiver>",
-                codex_weekly_usage="status-check-placeholder",
-                codex_allowance_decision="continue",
-            )
+    report = run_strategic_muzero_run_loop(
+        StrategicMuZeroRunLoopConfig(
+            out_dir=tmp_path,
+            seed=23,
+            cache_episodes=2,
+            cache_rows=16,
+            mcts_simulations=4,
+            mcts_max_depth=4,
+            mcts_rollout_steps=2,
+            train_epochs=3,
+            train_learning_rate=0.02,
+            baseline_episodes=2,
+            parity_seeds=(0,),
+            parity_scenarios=("reset_only",),
+            codex_allowance_source="user-waived",
+            codex_five_hour_window_remaining="waived",
+            codex_weekly_usage="waived",
+            codex_allowance_decision="continue",
         )
+    )
+
+    state = json.loads((tmp_path / "loop-state.json").read_text(encoding="utf-8"))
+
+    assert report["status"] == "pass"
+    assert state["codex_allowance_check"]["source"] == "user-waived"
+    assert state["codex_allowance_check"]["decision"] == "continue"
+    assert "queue the longer MuZero-style run" in state["current_next_action"]

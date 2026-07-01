@@ -66,7 +66,7 @@ env -u UV_PYTHON uv run python -m mini_tft.tools.strategic_muzero_run_loop \
   --train-epochs 24 \
   --train-learning-rate 0.03 \
   --baseline-episodes 32 \
-  --codex-allowance-source user \
+  --codex-allowance-source "Codex usage dashboard" \
   --codex-5h-window-remaining ample \
   --codex-weekly-usage ample \
   --codex-allowance-decision continue \
@@ -92,6 +92,30 @@ env -u UV_PYTHON uv run python -m mini_tft.tools.benchmark_puffer4_ocean \
   --envs 4096 \
   --steps 10000000
 ```
+
+Queue a checkpoint-guided strategic MCTS smoke after a Torch V0 checkpoint
+exists:
+
+```bash
+RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
+OUT="artifacts/strategic_lane/checkpoint_guided_mcts_${RUN_ID}"
+CHECKPOINT="/path/to/strategic_muzero_torch.pt"
+
+env -u UV_PYTHON uv run --extra train \
+  python -m mini_tft.tools.checkpoint_guided_mcts_smoke \
+  --out-dir "$OUT" \
+  --checkpoint "$CHECKPOINT" \
+  --episodes 512 \
+  --max-rows 8192 \
+  --simulations 64 \
+  --max-depth 10 \
+  --rollout-steps 6 \
+  --strict
+```
+
+The primary rows use checkpoint policy priors with heuristic leaf values.
+Checkpoint leaf values are recorded as a matched ablation, not as the default
+promotion path.
 
 The saved CUDA trainer smoke was run from a PufferLib 4.0 checkout, not from
 the repo root:

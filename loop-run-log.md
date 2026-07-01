@@ -198,3 +198,72 @@ Next action: Start `feat/puffer-material-speedup` from the updated runbook.
 - Next action: pause unless the final verifier accepts; after acceptance, wait
   for a real `/status` or usage-dashboard allowance check, or an explicit user
   waiver, before launching the long run.
+
+## 2026-07-01T08:19:42+08:00 - strategic_muzero_v0_dual4090_overnight_packet - waiver update
+
+- Action: removed the prior allowance pause as a launch requirement after explicit user
+  waiver, updated the V0 loop and overnight wrapper defaults to record
+  `user-waived` launch metadata, and changed the packet from
+  `prepared_paused` to `prepared_ready`.
+- Validation: focused runner/overnight tests, Ruff, packet JSON/shell checks,
+  remote sync, and read-only verifier rerun are pending after this update.
+- Verifier verdict: pending.
+- Next action: queue the prepared long run when ready; stop on failed quality
+  gate, attempt cap, remote readiness failure, or post-run judge rejection.
+
+## 2026-07-01T08:44:28+08:00 - strategic_muzero_goal2_checkpoint_guided_mcts - attempt 1/3
+
+- Action: stopped superseded heuristic-prior run `20260701T003039Z` before cache
+  generation and pivoted the packet toward Goal 2 checkpoint-guided strategic
+  MCTS using the accepted Torch V0 checkpoint.
+- Validation: focused checkpoint-guided MCTS tests passed; full focused suite,
+  Pyright, diff check, remote checkpoint-guided smoke, and 64-simulation timing
+  smoke passed after packet refresh.
+- Verifier verdict: REJECT; findings require richer generated loop state/log,
+  explicit fail-closed post-run judge checking, coherent root log state, and
+  removal of fake allowance-check metadata.
+- Next action: fix verifier findings and rerun read-only verifier before
+  queueing `checkpoint_guided_mcts_<RUN_ID>`.
+
+## 2026-07-01T08:55:00+08:00 - strategic_muzero_goal2_checkpoint_guided_mcts - verifier retry
+
+- Action: addressing verifier rejection by strengthening generated loop
+  artifacts, post-run judge checking, and packet metadata.
+- Validation: pending after patch.
+- Verifier verdict: REJECT from first read-only verifier pass.
+- Next action: rerun focused checks, sync packet/code, and rerun read-only
+  verifier.
+
+## 2026-07-01T09:01:14+08:00 - strategic_muzero_goal2_checkpoint_guided_mcts - launch attempt 1
+
+- Action: queued `tft-zero-checkpoint-guided-mcts-20260701T010114Z` on
+  `dual4090` GPU 0 after verifier acceptance.
+- Validation: run failed immediately before cache completion with
+  `RuntimeError: checkpoint policy produced no legal probability mass`.
+- Verifier verdict: prior ACCEPT invalidated by runtime failure.
+- Next action: fix checkpoint value handling for empty legal masks, rerun local
+  and remote seed-5000 reproductions, then rerun verifier before requeueing.
+
+## 2026-07-01T09:03:38+08:00 - strategic_muzero_goal2_checkpoint_guided_mcts - empty-mask fix
+
+- Action: changed checkpoint value evaluation to allow empty legal masks on the
+  value-only path while preserving strict legal probability checks for policy
+  priors.
+- Validation: focused checkpoint tests passed; seed-5000 local reproduction
+  passed `15/15`; seed-5000 remote reproduction passed `15/15`; focused suite,
+  Pyright, and `git diff --check` passed.
+- Verifier verdict: pending rerun after runtime fix.
+- Next action: refresh packet metadata, rerun read-only verifier, and requeue
+  only if accepted.
+
+## 2026-07-01T09:09:04+08:00 - strategic_muzero_goal2_checkpoint_guided_mcts - launch attempt 2
+
+- Action: queued `tft-zero-checkpoint-guided-mcts-20260701T010904Z` on
+  `dual4090` GPU 0 as attempt `2/3` after verifier acceptance.
+- Validation: `run-serious` reports the run as running; initial launch log
+  records the intended checkpoint-guided command.
+- Verifier verdict: ACCEPT before launch attempt `2/3`.
+- Next action: monitor
+  `/srv/runs/derek/20260701-090907-tft-zero-checkpoint-guided-mcts-20260701T010904Z`
+  and collect `artifacts/strategic_lane/checkpoint_guided_mcts_20260701T010904Z/`
+  when complete.

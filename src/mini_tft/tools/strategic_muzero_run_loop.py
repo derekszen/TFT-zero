@@ -235,13 +235,21 @@ def _validate_config(config: StrategicMuZeroRunLoopConfig) -> None:
         raise ValueError("wall_clock_limit_minutes must be positive")
     if config.automation_level not in {"L1", "L2"}:
         raise ValueError("automation_level must be L1 or L2 for this local harness")
-    if config.codex_allowance_source not in {"/status", "Codex usage dashboard", "unknown"}:
+    if config.codex_allowance_source not in {
+        "/status",
+        "Codex usage dashboard",
+        "unknown",
+        "user-waived",
+    }:
         raise ValueError(
-            "codex_allowance_source must be /status, Codex usage dashboard, or unknown"
+            "codex_allowance_source must be /status, Codex usage dashboard, unknown, or user-waived"
         )
     if config.codex_allowance_source == "unknown" and config.codex_allowance_decision == "continue":
         raise ValueError("unknown codex allowance source cannot use continue decision")
-    if config.codex_allowance_decision == "continue":
+    if (
+        config.codex_allowance_decision == "continue"
+        and config.codex_allowance_source != "user-waived"
+    ):
         for label, value in (
             ("codex_five_hour_window_remaining", config.codex_five_hour_window_remaining),
             ("codex_weekly_usage", config.codex_weekly_usage),
@@ -998,7 +1006,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--cc", default="cc")
     parser.add_argument(
         "--codex-allowance-source",
-        choices=["/status", "Codex usage dashboard", "unknown"],
+        choices=["/status", "Codex usage dashboard", "unknown", "user-waived"],
         default="unknown",
     )
     parser.add_argument("--codex-5h-window-remaining", default="unknown")

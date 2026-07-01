@@ -88,6 +88,7 @@ def generate_mcts_cache(
         config=mcts_config or StrategicMCTSConfig(),
         simulator_config=config,
     )
+    planner_config = planner.config
     for episode in range(episodes):
         state = reset(seed=seed + episode, config=config)
         episode_rows: list[CacheRow] = []
@@ -98,6 +99,12 @@ def generate_mcts_cache(
             action = int(decision.selected_action)
             result = step(state, action, config)
             next_obs = observe(state, config)
+            policy_target_source = (
+                "checkpoint_guided_mcts"
+                if planner_config.prior_mode == "checkpoint"
+                or planner_config.value_mode == "checkpoint"
+                else "mcts"
+            )
             episode_rows.append(
                 CacheRow(
                     observation=obs,
@@ -116,9 +123,12 @@ def generate_mcts_cache(
                         "placement_proxy": result.info["placement_proxy"],
                         "scenario_score": scenario_score(state, config),
                         "legal_action": result.info["legal_action"],
-                        "policy_target_source": "mcts",
+                        "policy_target_source": policy_target_source,
                         "mcts_simulations": decision.simulations_run,
                         "mcts_max_depth": decision.max_depth,
+                        "mcts_prior_mode": planner_config.prior_mode,
+                        "mcts_value_mode": planner_config.value_mode,
+                        "checkpoint_path": planner_config.checkpoint_path,
                         "mcts_elapsed_ms": decision.elapsed_ms,
                         "mcts_root_visits": int(sum(decision.action_visits.values())),
                     },
