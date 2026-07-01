@@ -16,46 +16,69 @@ experiments:
 - PufferLib 4.0 C/Ocean standalone and CUDA trainer throughput smoke evidence;
 - a 1024-row MuZero-style cache with MCTS visit-policy targets;
 - a tiny policy/value/dynamics train smoke over that cache;
+- a 262,144-row cache-supervised Torch MuZero-style V0 overnight smoke run on a
+  local RTX 5090 D workstation with about 32 GB VRAM;
 - a read-only verifier accepting the MuZero-readiness loop.
 
 Do not claim full TFT fidelity, real ranked performance, current-patch MetaTFT
-validity, full MuZero self-play, or final production MuZero training. The train
-piece here is a tiny linear policy/value/dynamics smoke model, not a full
-learned recurrent MuZero model with model-backed search training.
+validity, full MuZero self-play, or final production MuZero training. The main
+checkout train piece is a tiny linear policy/value/dynamics smoke model. The
+overnight result is a cache-supervised Torch V0 trainer over simulator/MCTS
+targets, not full iterative MuZero with model-backed search.
 
 ## Latest Evidence Addendum, 2026-07-01
 
 Use this addendum before older goal1 sections when writing the paper.
 
-The requested report-evidence path
-`artifacts/strategic_lane/muzero_overnight_20260630T174428Z` was not present in
-the inspected checkout. The available full strategic MuZero overnight launch
-evidence is:
+Primary overnight evidence:
 
 ```text
-artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked/metrics.json
-artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked/final_report.md
-artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked/decision.md
-artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked/verifier/metrics.json
+/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/muzero_overnight_20260630T174428Z/metrics.json
+/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/muzero_overnight_20260630T174428Z/final_report.md
+/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/muzero_overnight_20260630T174428Z/train_torch/strategic_muzero_torch.pt
 ```
 
-Result:
+Key values:
 
-- status: `blocked`;
-- objective: prepare and queue the overnight full strategic MuZero-style run
-  after preflight;
-- preflight status: `pass`;
-- preflight verifier: `ACCEPT`, `21/21` checks;
-- cache rows: `1024`;
+- status: `smoke_only`;
+- hardware: local RTX 5090 D workstation, about 32 GB VRAM;
+- command surface:
+  `mini_tft.tools.run_strategic_muzero_overnight`;
+- elapsed: `151.657` sec;
+- cache rows: `262,144`;
 - observation/action shape: `38 x 11`;
 - legal action rate: `1.0`;
 - MCTS target rate: `1.0`;
-- parity matrix: `48/48` checks passed;
-- checkpoint exists: `true`;
-- blocker: no production/full strategic MuZero trainer entry point exists yet.
+- native MCTS cache-target generation: `5,710.97` decisions/sec;
+- parity matrix: `96/96` checks passed;
+- Torch train device: `cuda`;
+- Torch train rows: `262,144`;
+- Torch train epochs: `64`;
+- Torch hidden size: `256`;
+- Torch batch size: `2048`;
+- Torch total loss: `4.620549` to `0.835981`;
+- Torch policy loss: `1.916569` to `0.798829`;
+- Torch value loss: `2.674111` to `0.036199`;
+- Torch dynamics loss: `0.119474` to `0.003810`;
+- Torch policy-target top-1 accuracy: `0.970245`;
+- legal argmax rate: `1.0`;
+- gate: `ACCEPT`, `21/21` checks.
 
-This is strong preflight evidence for queue readiness, but it is not a final
-training result.
+Policy-eval caveat:
+
+- heuristic remains best by mean placement and scenario score;
+- greedy Torch policy-head eval is smoke-only and not model-backed search;
+- Torch policy mean reward was `-2.267` vs heuristic `-2.174` over `512`
+  episodes.
+
+Safe paper wording:
+
+> On a local RTX 5090 D workstation with about 32 GB VRAM, the strategic
+> MuZero-style V0 overnight smoke generated a 262k-row legal-masked cache with
+> native simulator-backed MCTS targets, trained a CUDA Torch policy/value/
+> dynamics model for 64 epochs, and passed a 21-check gate. This is
+> cache-supervised MuZero-style infrastructure, not full iterative MuZero
+> self-play or learned model-backed search.
 
 The latest complete MuZero-readiness loop artifact is:
 

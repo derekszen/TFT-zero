@@ -31,21 +31,22 @@ Read these first:
 4. [docs/TRAINING.md](docs/TRAINING.md)
 5. [artifacts/paper_agent_context/README.md](artifacts/paper_agent_context/README.md)
 
-Current report evidence in this checkout starts here:
+Current report evidence in the main checkout starts here:
 
 - `artifacts/strategic_lane/muzero_run_loop/metrics.json`
-- `artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked/final_report.md`
-- `artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked/metrics.json`
 - `artifacts/strategic_lane/mcts_native_overnight_20260630T235353/metrics.json`
 - `artifacts/strategic_lane/puffer4_speedup_paper/metrics.json`
 
-The requested path
-`artifacts/strategic_lane/muzero_overnight_20260630T174428Z` was not present
-when this README was refreshed. The available full-MuZero overnight launch
-evidence is
-`artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked`, which
-passed preflight but stopped because no production/full strategic MuZero trainer
-entry point exists yet.
+Latest overnight result:
+
+- `/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/muzero_overnight_20260630T174428Z/metrics.json`
+
+This was run locally on an RTX 5090 D workstation with about 32 GB VRAM using
+`mini_tft.tools.run_strategic_muzero_overnight`. It produced `262,144`
+legal-masked cache rows, native-MCTS cache targets at `5,710.97` decisions/sec,
+CUDA Torch V0 training for `64` epochs, total loss `4.620549 -> 0.835981`, and
+a gate verdict of `ACCEPT` with `21/21` checks. It is `smoke_only`
+cache-supervised MuZero-style evidence, not full iterative MuZero self-play.
 
 Queue a scaffolded MuZero-readiness run:
 
@@ -111,11 +112,11 @@ When updating results for a paper-writing agent:
 2. Update both this README and
    `artifacts/paper_agent_context/README.md` with exact paths, dates, statuses,
    row counts, speeds, loss deltas, and verifier verdicts.
-3. Preserve labels such as `smoke_only`, `blocked`, and `pass`; do not promote
-   a result beyond its artifact status.
-4. For MuZero evidence, always say whether the model is the tiny train smoke or
-   a full recurrent learned MuZero trainer. The current full trainer is
-   missing.
+3. Preserve artifact status labels exactly; do not promote a result beyond its
+   artifact status.
+4. For MuZero evidence, always state whether the result is the tiny NumPy train
+   smoke, the cache-supervised Torch V0 trainer, or a full iterative recurrent
+   MuZero trainer. The current overnight result is Torch V0, not full MuZero.
 5. Run `git diff --check README.md artifacts/paper_agent_context/README.md`
    after documentation edits.
 
@@ -126,9 +127,9 @@ As of 2026-07-01, the strongest current evidence is:
 | Lane | Main artifact | Key result | Status |
 | --- | --- | --- | --- |
 | PufferLib 4.0 C/Ocean and CUDA trainer smoke | `artifacts/strategic_lane/puffer4_speedup_paper/metrics.json` | Python scalar `25,259.39` steps/s; Ocean C standalone `3,755,013.36` steps/s (`148.66x`); CUDA trainer smoke `9,017,194` agent steps/s (`356.98x`) | `smoke_only` |
+| Strategic MuZero overnight V0 | `/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/muzero_overnight_20260630T174428Z/metrics.json` | RTX 5090 D local smoke: `262,144` cache rows, obs/action shape `38 x 11`, native MCTS targets at `5,710.97` decisions/s, CUDA Torch training for `64` epochs, total loss `4.620549 -> 0.835981`, gate `ACCEPT` with `21/21` checks | `smoke_only` |
 | MuZero-readiness loop | `artifacts/strategic_lane/muzero_run_loop/metrics.json` | `1024` cache rows, obs/action shape `38 x 11`, legal action rate `1.0`, MCTS target rate `1.0`, verifier `ACCEPT` with `21/21` checks | `pass` for readiness |
 | Tiny train smoke over MuZero-style cache | `artifacts/strategic_lane/muzero_run_loop/train_smoke/metrics.json` | total loss `4.892351 -> 2.340075`, policy loss `2.396928 -> 2.043442`, value loss `2.372969 -> 0.200895`, dynamics loss `0.122454 -> 0.095737` | `smoke_only` |
-| Full strategic MuZero overnight launch | `artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked/metrics.json` | preflight passed with verifier `ACCEPT`, but launch blocked because no production/full strategic MuZero trainer entry point exists | `blocked` |
 | Native simulator-backed MCTS overnight | `artifacts/strategic_lane/mcts_native_overnight_20260630T235353/metrics.json` | `65,536` episodes/policy; best reward and scenario score from `mcts_1024`; `mcts_1024` reward `-1.339` vs heuristic `-2.187`; `446,638` simulations/s at 1024 sims | `smoke_only` |
 | Python simulator-backed MCTS overnight | `artifacts/strategic_lane/mcts_overnight_20260630T203555/metrics.json` | `1,024` episodes/policy; best placement from `mcts_64`; best reward and scenario score from `mcts_256` | `smoke_only` |
 
@@ -139,9 +140,12 @@ Current claim-safe reading:
 - The MuZero-readiness loop can generate deterministic cache/search/train-smoke
   artifacts with legal masks, policy targets, value targets, parity evidence,
   and verifier acceptance.
+- The local RTX 5090 D overnight smoke scales this to 262k rows and a CUDA
+  Torch supervised trainer over simulator/MCTS targets.
 - Native simulator-backed MCTS improves reward and scenario score in the latest
   overnight run, but not the placement proxy.
-- No final production MuZero trainer has been launched.
+- No full iterative MuZero self-play or learned model-backed search result has
+  been launched.
 
 ## Main Artifacts
 
@@ -162,13 +166,12 @@ artifacts/strategic_lane/muzero_run_loop/train_smoke/train_smoke.npz
 artifacts/strategic_lane/muzero_run_loop/verifier/metrics.json
 ```
 
-Blocked full-MuZero overnight launch:
+Latest local overnight smoke:
 
 ```text
-artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked/metrics.json
-artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked/final_report.md
-artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked/decision.md
-artifacts/strategic_lane/muzero_overnight_20260630T155605Z_blocked/verifier/metrics.json
+/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/muzero_overnight_20260630T174428Z/metrics.json
+/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/muzero_overnight_20260630T174428Z/final_report.md
+/mnt/ssd2/Projects/TFT-zero-strategic-muzero-overnight/artifacts/strategic_lane/muzero_overnight_20260630T174428Z/train_torch/strategic_muzero_torch.pt
 ```
 
 Native MCTS overnight:
@@ -325,6 +328,8 @@ new PufferLib 4.0 trainer number.
   MuZero dynamics.
 - The current MuZero train step is a tiny linear policy/value/dynamics smoke,
   not full learned recurrent MuZero plus search training.
-- Full MuZero claims require a production trainer entry point, model-backed
-  search, legal masks, auditable cache rows, deterministic seeds, and baseline
-  comparisons under [docs/QUALITY_GATE.md](docs/QUALITY_GATE.md).
+- The Torch V0 overnight is supervised training on simulator/MCTS cache targets,
+  not full iterative MuZero self-play.
+- Full MuZero claims require model-backed search/reanalysis, legal masks,
+  auditable cache rows, deterministic seeds, and baseline comparisons under
+  [docs/QUALITY_GATE.md](docs/QUALITY_GATE.md).
