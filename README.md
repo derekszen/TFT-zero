@@ -252,3 +252,13 @@ env -u UV_PYTHON uv run python -m mini_tft.tools.benchmark_puffer4_ocean \
   acceptance.
 - Missing, malformed, or `REJECT` Antigravity verdicts block promotion unless
   the user explicitly approves a documented fallback.
+
+## Pending Run TODO
+
+- Pending: dual4090 Goal 2 checkpoint-guided strategic MCTS run.
+- Superseded: heuristic-prior run `20260701T003039Z` was stopped before cache
+  generation because it did not close the checkpoint-guided search loop.
+- Target artifact: `artifacts/strategic_lane/checkpoint_guided_mcts_<RUN_ID>/`.
+- Expected evidence: accepted Torch V0 checkpoint loading, checkpoint
+  policy/value guided MCTS rows, matched heuristic-prior comparison rows,
+  machine-readable quality checks, and local post-run Antigravity judge verdict.

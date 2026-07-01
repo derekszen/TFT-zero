@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from math import log, sqrt
 from time import perf_counter
@@ -24,6 +25,11 @@ from mini_tft.strategic.core.state import (
     StrategicState,
 )
 
+StrategicMCTSEvaluator = Callable[
+    [StrategicState, NDArray[np.bool_], StrategicConfig],
+    tuple[NDArray[np.float32], float],
+]
+
 
 @dataclass(frozen=True)
 class StrategicMCTSConfig:
@@ -33,6 +39,13 @@ class StrategicMCTSConfig:
     exploration: float = 1.4
     gamma: float = 0.97
     prior_mode: str = "uniform"
+    value_mode: str = "heuristic"
+    checkpoint_path: str | None = None
+    checkpoint_evaluator: StrategicMCTSEvaluator | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
 
 
 @dataclass
@@ -81,6 +94,14 @@ class StrategicMCTSPlanner:
             raise ValueError("rollout_steps must be non-negative")
         if self.config.gamma <= 0.0:
             raise ValueError("gamma must be positive")
+        if self.config.prior_mode not in {"uniform", "heuristic", "checkpoint"}:
+            raise ValueError("prior_mode must be one of: uniform, heuristic, checkpoint")
+        if self.config.value_mode not in {"heuristic", "checkpoint"}:
+            raise ValueError("value_mode must be one of: heuristic, checkpoint")
+        if (
+            self.config.prior_mode == "checkpoint" or self.config.value_mode == "checkpoint"
+        ) and self.config.checkpoint_evaluator is None:
+            raise ValueError("checkpoint-guided MCTS requires checkpoint_evaluator")
         self.simulator_config = simulator_config
         self.rollout_policy = rollout_policy
         self.max_depth_seen = 0
@@ -120,6 +141,9 @@ class StrategicMCTSPlanner:
         trace = {
             "kind": "strategic_mcts_decision",
             "simulations": self.config.simulations,
+            "prior_mode": self.config.prior_mode,
+            "value_mode": self.config.value_mode,
+            "checkpoint_path": self.config.checkpoint_path,
             "selected_action": selected_action,
             "selected_action_name": action_name(selected_action),
             "legal_actions": [
@@ -231,6 +255,10 @@ class StrategicMCTSPlanner:
         return value + discount * self._value(rollout_state)
 
     def _value(self, state: StrategicState) -> float:
+        if self.config.value_mode == "checkpoint":
+            mask = legal_action_mask(state, self.simulator_config)
+            _, value = self._checkpoint_policy_value(state, mask)
+            return value
         score = scenario_score(state, self.simulator_config)
         placement = placement_proxy(state, self.simulator_config)
         placement_score = (8.0 - float(placement)) / 7.0
@@ -239,6 +267,18 @@ class StrategicMCTSPlanner:
     def _priors(self, state: StrategicState, legal_actions: list[int]) -> list[float]:
         if not legal_actions:
             return []
+        if self.config.prior_mode == "checkpoint":
+            mask = legal_action_mask(state, self.simulator_config)
+            priors, _ = self._checkpoint_policy_value(state, mask)
+            selected = np.asarray(
+                [float(priors[action]) for action in legal_actions],
+                dtype=np.float32,
+            )
+            total = float(selected.sum())
+            if not np.all(np.isfinite(selected)) or total <= 0.0:
+                raise RuntimeError("checkpoint evaluator returned invalid legal priors")
+            selected /= total
+            return [float(value) for value in selected.tolist()]
         if self.config.prior_mode == "heuristic":
             mask = legal_action_mask(state, self.simulator_config)
             heuristic_action = int(tft_heuristic_policy(state, mask, self.simulator_config))
@@ -248,3 +288,25 @@ class StrategicMCTSPlanner:
             priors /= float(priors.sum())
             return [float(value) for value in priors.tolist()]
         return [1.0 / len(legal_actions)] * len(legal_actions)
+
+    def _checkpoint_policy_value(
+        self,
+        state: StrategicState,
+        mask: NDArray[np.bool_],
+    ) -> tuple[NDArray[np.float32], float]:
+        if self.config.checkpoint_evaluator is None:
+            raise RuntimeError("checkpoint-guided MCTS requires checkpoint_evaluator")
+        priors, value = self.config.checkpoint_evaluator(state, mask, self.simulator_config)
+        priors = np.asarray(priors, dtype=np.float32)
+        if priors.shape != mask.shape:
+            raise RuntimeError("checkpoint prior shape does not match legal action mask")
+        if not np.all(np.isfinite(priors)):
+            raise RuntimeError("checkpoint prior contains non-finite values")
+        if not np.isfinite(float(value)):
+            raise RuntimeError("checkpoint value is non-finite")
+        priors = np.where(mask, np.clip(priors, 0.0, None), 0.0).astype(np.float32)
+        total = float(priors.sum())
+        if total <= 0.0:
+            raise RuntimeError("checkpoint prior has no legal probability mass")
+        priors /= total
+        return priors, float(value)

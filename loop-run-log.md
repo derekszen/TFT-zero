@@ -210,3 +210,16 @@ Next action: Start `feat/puffer-material-speedup` from the updated runbook.
 - Verifier verdict: pending.
 - Next action: queue the prepared long run when ready; stop on failed quality
   gate, attempt cap, remote readiness failure, or post-run judge rejection.
+
+## 2026-07-01T08:44:28+08:00 - strategic_muzero_goal2_checkpoint_guided_mcts - attempt 1/3
+
+- Action: stopped superseded heuristic-prior run `20260701T003039Z` before cache
+  generation and pivoted the packet toward Goal 2 checkpoint-guided strategic
+  MCTS using the accepted Torch V0 checkpoint.
+- Validation: focused checkpoint-guided MCTS tests passed; full focused suite,
+  Pyright, diff check, remote smoke, and read-only verifier are pending after
+  packet refresh.
+- Verifier verdict: pending.
+- Next action: update the dual4090 packet to launch
+  `checkpoint_guided_mcts_<RUN_ID>`, sync checkpoint/code to `dual4090`, run the
+  remote smoke, and queue only if verifier accepts.

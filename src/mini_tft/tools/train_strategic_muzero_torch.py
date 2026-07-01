@@ -296,9 +296,17 @@ def run_torch_checkpoint_policy_evaluation(
 
 
 _StrategicPolicy = Callable[[Any, NDArray[np.bool_], StrategicConfig], int]
+_StrategicPolicyValue = Callable[
+    [Any, NDArray[np.bool_], StrategicConfig],
+    tuple[NDArray[np.float32], float],
+]
 
 
-def load_torch_muzero_policy(checkpoint_path: Path, *, device: str = "cpu") -> _StrategicPolicy:
+def load_torch_muzero_policy_value(
+    checkpoint_path: Path,
+    *,
+    device: str = "cpu",
+) -> _StrategicPolicyValue:
     resolved_device = _resolve_device(device)
     checkpoint = torch.load(checkpoint_path, map_location=resolved_device, weights_only=False)
     metadata = dict(checkpoint["metadata"])
@@ -310,7 +318,11 @@ def load_torch_muzero_policy(checkpoint_path: Path, *, device: str = "cpu") -> _
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
 
-    def policy(state: Any, mask: NDArray[np.bool_], config: StrategicConfig) -> int:
+    def policy_value(
+        state: Any,
+        mask: NDArray[np.bool_],
+        config: StrategicConfig,
+    ) -> tuple[NDArray[np.float32], float]:
         del config
         obs = torch.as_tensor(
             observe(state),
@@ -319,9 +331,27 @@ def load_torch_muzero_policy(checkpoint_path: Path, *, device: str = "cpu") -> _
         ).unsqueeze(0)
         mask_tensor = torch.as_tensor(mask, dtype=torch.bool, device=resolved_device)
         with torch.no_grad():
-            logits = model.policy_logits(obs).squeeze(0)
+            hidden = model.representation(obs)
+            logits = model.policy_head(hidden).squeeze(0)
+            value = float(model.value_head(hidden).squeeze().detach().cpu().item())
             logits = logits.masked_fill(~mask_tensor, -1.0e9)
-            action = int(torch.argmax(logits).item())
+            priors = torch.softmax(logits, dim=-1)
+            priors = priors.masked_fill(~mask_tensor, 0.0)
+            total = priors.sum()
+            if not bool(torch.isfinite(total)) or float(total.detach().cpu().item()) <= 0.0:
+                raise RuntimeError("checkpoint policy produced no legal probability mass")
+            priors = priors / total
+        return priors.detach().cpu().numpy().astype(np.float32), value
+
+    return policy_value
+
+
+def load_torch_muzero_policy(checkpoint_path: Path, *, device: str = "cpu") -> _StrategicPolicy:
+    policy_value = load_torch_muzero_policy_value(checkpoint_path, device=device)
+
+    def policy(state: Any, mask: NDArray[np.bool_], config: StrategicConfig) -> int:
+        priors, _ = policy_value(state, mask, config)
+        action = int(np.argmax(priors))
         return action
 
     return policy
