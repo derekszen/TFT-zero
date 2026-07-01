@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
+import torch
 
 from mini_tft.strategic.adapters.mcts import StrategicMCTSConfig, StrategicMCTSPlanner
 from mini_tft.strategic.core import StrategicConfig, legal_action_mask, reset
@@ -48,6 +49,40 @@ def test_checkpoint_policy_value_allows_empty_mask_for_value_only(tmp_path) -> N
     assert priors.shape == mask.shape
     assert float(priors.sum()) == pytest.approx(0.0)
     assert value == pytest.approx(float(value))
+
+
+def test_checkpoint_policy_value_cache_returns_independent_priors(tmp_path) -> None:
+    checkpoint = _tiny_checkpoint(tmp_path)
+    evaluator = load_torch_muzero_policy_value(checkpoint, device="cpu")
+    state = reset(seed=5)
+    mask = legal_action_mask(state)
+
+    priors, value = evaluator(state, mask, StrategicConfig())
+    priors[:] = 0.0
+    cached_priors, cached_value = evaluator(state, mask, StrategicConfig())
+
+    assert float(cached_priors.sum()) == pytest.approx(1.0)
+    assert float(cached_priors[~mask].sum()) == pytest.approx(0.0)
+    assert cached_value == pytest.approx(value)
+
+
+def test_checkpoint_policy_value_rejects_malformed_checkpoint(tmp_path) -> None:
+    bad_checkpoint = tmp_path / "bad.pt"
+    torch.save({"schema": "wrong"}, bad_checkpoint)
+
+    with pytest.raises(ValueError, match="invalid strategic MuZero checkpoint schema"):
+        load_torch_muzero_policy_value(bad_checkpoint, device="cpu")
+
+
+def test_checkpoint_policy_value_rejects_wrong_dimension_checkpoint(tmp_path) -> None:
+    checkpoint = _tiny_checkpoint(tmp_path)
+    payload = torch.load(checkpoint, map_location="cpu", weights_only=False)
+    payload["metadata"]["hidden_size"] = int(payload["metadata"]["hidden_size"]) + 1
+    bad_checkpoint = tmp_path / "bad_dim.pt"
+    torch.save(payload, bad_checkpoint)
+
+    with pytest.raises(ValueError, match="weights do not match checkpoint metadata"):
+        load_torch_muzero_policy_value(bad_checkpoint, device="cpu")
 
 
 def test_checkpoint_guided_mcts_records_checkpoint_metadata(tmp_path) -> None:
@@ -107,20 +142,26 @@ def test_checkpoint_guided_mcts_smoke_writes_comparison_artifacts(tmp_path) -> N
     assert report["metrics"]["programmatic_checks_passed"] == report["metrics"][
         "programmatic_checks_total"
     ]
-    assert report["metrics"]["quality_checks"]["checkpoint_prior_mode_recorded"] is True
-    assert report["metrics"]["quality_checks"]["checkpoint_value_mode_recorded"] is True
-    assert report["metrics"]["comparison"]["rows_match"] is True
+    assert report["metrics"]["quality_checks"]["checkpoint_prior_prior_mode_recorded"] is True
+    assert report["metrics"]["quality_checks"]["checkpoint_prior_value_mode_recorded"] is True
+    assert report["metrics"]["quality_checks"]["checkpoint_full_prior_mode_recorded"] is True
+    assert report["metrics"]["quality_checks"]["checkpoint_full_value_mode_recorded"] is True
+    assert report["metrics"]["comparison"]["rows_match_across_modes"] is True
+    assert report["metrics"]["comparison"]["recommended_mode"] == (
+        "checkpoint_prior_heuristic_value"
+    )
     assert rows
     assert rows[0]["metadata"]["policy_target_source"] == "checkpoint_guided_mcts"
     assert rows[0]["metadata"]["mcts_prior_mode"] == "checkpoint"
-    assert rows[0]["metadata"]["mcts_value_mode"] == "checkpoint"
+    assert rows[0]["metadata"]["mcts_value_mode"] == "heuristic"
     assert loop_state["owner"] == "codex"
     assert loop_state["verifier"] == "pending_post_run_judge"
     assert loop_state["state_prune_rules"]
     assert loop_state["pause_criteria"]
     assert loop_state["kill_criteria"]
     assert "pending post-run judge" in loop_log
-    assert (out_dir / "checkpoint_guided_cache" / "metrics.json").exists()
+    assert (out_dir / "checkpoint_prior_cache" / "metrics.json").exists()
+    assert (out_dir / "checkpoint_full_cache" / "metrics.json").exists()
     assert (out_dir / "heuristic_cache" / "metrics.json").exists()
 
 
