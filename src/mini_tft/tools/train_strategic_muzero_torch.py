@@ -19,7 +19,12 @@ from torch import Tensor, nn
 from torch.nn import functional as F
 
 from mini_tft.strategic.adapters.analytics import summarize_episode_rows
-from mini_tft.strategic.adapters.baselines import random_policy, tft_heuristic_policy
+from mini_tft.strategic.adapters.baselines import (
+    random_policy,
+    tft_heuristic_policy,
+    weakest_legal_policy,
+    worst_first_policy,
+)
 from mini_tft.strategic.core import (
     NUM_ACTIONS,
     StrategicConfig,
@@ -238,6 +243,8 @@ def run_torch_checkpoint_policy_evaluation(
     trained_policy = load_torch_muzero_policy(config.checkpoint_path, device=config.device)
     policies: tuple[tuple[str, _StrategicPolicy], ...] = (
         ("random", random_policy),
+        ("weakest_legal", weakest_legal_policy),
+        ("worst_first", worst_first_policy),
         ("heuristic", tft_heuristic_policy),
         ("torch_muzero", trained_policy),
     )

@@ -83,6 +83,23 @@ def test_strategic_policy_evaluation_is_deterministic(tmp_path) -> None:
     assert left == right
 
 
+def test_weakest_legal_policy_is_explicit_legal_baseline(tmp_path) -> None:
+    report = run_strategic_policy_evaluation(
+        StrategicPolicyEvaluationConfig(
+            out_dir=tmp_path,
+            policies=build_policy_specs(["weakest_legal", "worst_first"]),
+            episodes=2,
+            seed=11,
+        )
+    )
+
+    assert report["policies"] == ["weakest_legal", "worst_first"]
+    for policy in report["policies"]:
+        summary = report["policy_summaries"][policy]
+        assert summary["illegal_action_count"] == 0
+        assert summary["action_counts"]["hold"] == summary["total_actions"]
+
+
 def test_strategic_policy_evaluation_rejects_unknown_policy(tmp_path) -> None:
     with pytest.raises(ValueError, match="unknown strategic policy"):
         run_strategic_policy_evaluation(

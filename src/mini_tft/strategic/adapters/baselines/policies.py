@@ -23,6 +23,41 @@ def first_legal_policy(
     return int(legal[0]) if len(legal) else int(StrategicAction.HOLD)
 
 
+def weakest_legal_policy(
+    _state: StrategicState,
+    mask: NDArray[np.bool_],
+    _config: StrategicConfig,
+) -> int:
+    """Choose a deterministic legal action with intentionally weak tempo."""
+
+    for action in (
+        StrategicAction.HOLD,
+        StrategicAction.GREED_ECON,
+        StrategicAction.ROLL,
+        StrategicAction.LEVEL,
+        StrategicAction.BUY_HIGHEST_COST,
+        StrategicAction.BUY_BEST_SYNERGY,
+        StrategicAction.BUY_BEST_UPGRADE,
+        StrategicAction.FIELD_STRONGEST,
+        StrategicAction.SLAM_SUPPORT_ITEM,
+        StrategicAction.SLAM_TANK_ITEM,
+        StrategicAction.SLAM_CARRY_ITEM,
+    ):
+        if mask[action]:
+            return int(action)
+    return int(StrategicAction.HOLD)
+
+
+def worst_first_policy(
+    state: StrategicState,
+    mask: NDArray[np.bool_],
+    config: StrategicConfig,
+) -> int:
+    """Alias for the intentionally weak legal-action baseline."""
+
+    return weakest_legal_policy(state, mask, config)
+
+
 def random_policy(
     state: StrategicState,
     mask: NDArray[np.bool_],

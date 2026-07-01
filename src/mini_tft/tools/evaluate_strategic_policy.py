@@ -15,6 +15,8 @@ from mini_tft.strategic.adapters.baselines import (
     StrategicPolicy,
     random_policy,
     tft_heuristic_policy,
+    weakest_legal_policy,
+    worst_first_policy,
 )
 from mini_tft.strategic.core import (
     NUM_ACTIONS,
@@ -33,6 +35,8 @@ from mini_tft.strategic.core.rules import run_episode
 POLICY_BY_NAME: dict[str, StrategicPolicy] = {
     "heuristic": tft_heuristic_policy,
     "random": random_policy,
+    "weakest_legal": weakest_legal_policy,
+    "worst_first": worst_first_policy,
 }
 DEFAULT_POLICY_NAMES = ("heuristic", "random")
 

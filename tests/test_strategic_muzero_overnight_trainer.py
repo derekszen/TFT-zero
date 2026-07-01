@@ -67,7 +67,13 @@ def test_torch_train_and_eval_write_checkpoint_and_metrics(tmp_path) -> None:
     assert train["legal_argmax_rate"] == pytest.approx(1.0)
     assert checkpoint.exists()
     assert eval_report["status"] == "smoke_only"
-    assert eval_report["policies"] == ["random", "heuristic", "torch_muzero"]
+    assert eval_report["policies"] == [
+        "random",
+        "weakest_legal",
+        "worst_first",
+        "heuristic",
+        "torch_muzero",
+    ]
     assert (eval_dir / "actions.jsonl").exists()
 
 
