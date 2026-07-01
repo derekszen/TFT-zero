@@ -29,30 +29,25 @@ Evaluate through the matching evaluator for the environment used. For lobby
 questions, report placement, top-1/top-4, HP, survived round, board strength,
 and illegal actions. Survival is not placement.
 
-## Puffer Smoke
+## PufferLib 4 Ocean Speed Smoke
 
 ```bash
-env -u UV_PYTHON uv run --extra puffer --extra train \
-  python -m mini_tft.rl.train_puffer_ppo \
-  --env-kind lobby \
-  --timesteps 16 \
-  --num-envs 2 \
-  --n-steps 4 \
-  --batch-size 4 \
-  --update-epochs 1 \
-  --device cpu \
-  --players 4 \
-  --max-round 3 \
-  --max-actions-per-round 2 \
-  --max-actions-per-player 2 \
-  --disallow-oracle-macro-actions \
-  --out artifacts/smoke/puffer_lobby.pt
+env -u UV_PYTHON uv run python -m mini_tft.tools.benchmark_puffer4_ocean \
+  --out-dir artifacts/strategic_lane/puffer4_ocean_smoke \
+  --envs 1024 \
+  --steps 1024
 ```
 
-This proves trainer wiring only. A Puffer speed claim requires repeated matched
-benchmarks and semantic parity as defined in `docs/QUALITY_GATE.md`.
+This is the active Puffer speed surface. It benchmarks the PufferLib 4
+Ocean-style C mirror of the strategic rules. A speed claim still requires
+repeated matched benchmarks and semantic parity as defined in
+`docs/QUALITY_GATE.md`.
 
-Strategic native Puffer smoke:
+## Legacy Puffer Wrapper Smoke
+
+The Python `mini_tft.rl.train_puffer_ppo` route is historical. It targets older
+Puffer wrapper APIs and is kept only for compatibility tests and checkpoint
+comparison. Prefer the PufferLib 4 Ocean route above for current speed evidence.
 
 ```bash
 env -u UV_PYTHON uv run --extra puffer --extra train \

@@ -118,5 +118,9 @@ Archived docs under `docs/archive/` preserve details for:
 - current-patch MetaTFT planner/value work;
 - fight-value teacher experiments.
 
+Use `docs/LEGACY_CODE.md` before deleting historical modules. Several old paths
+are no longer the active research lane but still have tests, checkpoint loaders,
+or UI references.
+
 Do not use those as active instructions unless the user explicitly reopens that
 track.
