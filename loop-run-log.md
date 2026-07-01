@@ -201,7 +201,7 @@ Next action: Start `feat/puffer-material-speedup` from the updated runbook.
 
 ## 2026-07-01T08:19:42+08:00 - strategic_muzero_v0_dual4090_overnight_packet - waiver update
 
-- Action: removed Codex allowance as a launch requirement after explicit user
+- Action: removed the prior allowance pause as a launch requirement after explicit user
   waiver, updated the V0 loop and overnight wrapper defaults to record
   `user-waived` launch metadata, and changed the packet from
   `prepared_paused` to `prepared_ready`.
@@ -217,9 +217,19 @@ Next action: Start `feat/puffer-material-speedup` from the updated runbook.
   generation and pivoted the packet toward Goal 2 checkpoint-guided strategic
   MCTS using the accepted Torch V0 checkpoint.
 - Validation: focused checkpoint-guided MCTS tests passed; full focused suite,
-  Pyright, diff check, remote smoke, and read-only verifier are pending after
-  packet refresh.
-- Verifier verdict: pending.
-- Next action: update the dual4090 packet to launch
-  `checkpoint_guided_mcts_<RUN_ID>`, sync checkpoint/code to `dual4090`, run the
-  remote smoke, and queue only if verifier accepts.
+  Pyright, diff check, remote checkpoint-guided smoke, and 64-simulation timing
+  smoke passed after packet refresh.
+- Verifier verdict: REJECT; findings require richer generated loop state/log,
+  explicit fail-closed post-run judge checking, coherent root log state, and
+  removal of fake allowance-check metadata.
+- Next action: fix verifier findings and rerun read-only verifier before
+  queueing `checkpoint_guided_mcts_<RUN_ID>`.
+
+## 2026-07-01T08:55:00+08:00 - strategic_muzero_goal2_checkpoint_guided_mcts - verifier retry
+
+- Action: addressing verifier rejection by strengthening generated loop
+  artifacts, post-run judge checking, and packet metadata.
+- Validation: pending after patch.
+- Verifier verdict: REJECT from first read-only verifier pass.
+- Next action: rerun focused checks, sync packet/code, and rerun read-only
+  verifier.

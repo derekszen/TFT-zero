@@ -85,6 +85,8 @@ def test_checkpoint_guided_mcts_smoke_writes_comparison_artifacts(tmp_path) -> N
         for line in (out_dir / "rows.jsonl").read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
+    loop_state = json.loads((out_dir / "loop-state.json").read_text(encoding="utf-8"))
+    loop_log = (out_dir / "loop-run-log.md").read_text(encoding="utf-8")
 
     assert persisted == report
     assert report["status"] == "pass"
@@ -98,8 +100,12 @@ def test_checkpoint_guided_mcts_smoke_writes_comparison_artifacts(tmp_path) -> N
     assert rows[0]["metadata"]["policy_target_source"] == "checkpoint_guided_mcts"
     assert rows[0]["metadata"]["mcts_prior_mode"] == "checkpoint"
     assert rows[0]["metadata"]["mcts_value_mode"] == "checkpoint"
-    assert (out_dir / "loop-state.json").exists()
-    assert (out_dir / "loop-run-log.md").exists()
+    assert loop_state["owner"] == "codex"
+    assert loop_state["verifier"] == "pending_post_run_judge"
+    assert loop_state["state_prune_rules"]
+    assert loop_state["pause_criteria"]
+    assert loop_state["kill_criteria"]
+    assert "pending post-run judge" in loop_log
     assert (out_dir / "checkpoint_guided_cache" / "metrics.json").exists()
     assert (out_dir / "heuristic_cache" / "metrics.json").exists()
 

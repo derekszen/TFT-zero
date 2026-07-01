@@ -288,18 +288,34 @@ def _loop_state(
     status = "accepted" if report.get("status") == "pass" else "blocked"
     return {
         "schema": "loop-state/v1",
+        "owner": "codex",
         "objective": "Verify checkpoint-guided strategic MCTS V0 cache generation.",
         "deliverable": "muzero_cache",
         "attempt_cap": 3,
         "attempt": 1,
         "status": status,
         "automation_level": "L1",
+        "state_prune_rules": [
+            "Keep the latest accepted or blocked state.",
+            "Keep all failed quality-check summaries until a newer accepted run exists.",
+            "Do not prune post-run judge verdict references.",
+        ],
         "acceptance_criteria": [
             "checkpoint loads and supplies legal policy priors",
             "checkpoint-guided MCTS writes cache rows with checkpoint metadata",
             "matched heuristic-prior comparison rows are generated",
             "zero illegal actions and finite targets in both caches",
             "programmatic quality checks all pass",
+        ],
+        "pause_criteria": [
+            "post-run judge verdict is missing, malformed, or REJECT",
+            "any programmatic quality check fails",
+            "checkpoint-guided cache or heuristic comparison artifact is missing",
+        ],
+        "kill_criteria": [
+            "attempt cap exceeds 3",
+            "the same quality-check failure repeats through the cap",
+            "checkpoint loading or inference fails after checkpoint path is verified",
         ],
         "blocked_condition": [
             "missing checkpoint",
@@ -311,7 +327,7 @@ def _loop_state(
             "python -m mini_tft.tools.checkpoint_guided_mcts_smoke --strict"
         ],
         "artifacts": report["artifacts"],
-        "verifier": "not_run",
+        "verifier": "pending_post_run_judge",
         "quality_checks": _mapping(_mapping(report.get("metrics")).get("quality_checks")),
         "config": {
             "checkpoint_path": str(config.checkpoint_path),
@@ -348,7 +364,7 @@ def _format_loop_log(report: Mapping[str, Any]) -> str:
                 f"{metrics.get('programmatic_checks_total')}; "
                 f"status `{report['status']}`."
             ),
-            "- Verifier verdict: not_run.",
+            "- Verifier verdict: pending post-run judge.",
             "- Next action: run the read-only post-run judge before promotion.",
             "",
         ]
