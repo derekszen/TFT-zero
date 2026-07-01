@@ -16,7 +16,7 @@ experiments.
 
 Current handoff material:
 
-- [Playable TFT-Zero simulator](https://d-zeng.com/projects/tft-zero)
+- [Hosted MiniTFT prototype](https://minitft.wahrwelt.world/)
 - [Paper/report agent context](artifacts/paper_agent_context/README.md)
 - [Paper draft in OpenAI Prism](https://prism.openai.com/?u=db147769-d04d-4a0c-bd51-3123fc427703&pg=1&m=neurips_2026.tex&d=7)
 
