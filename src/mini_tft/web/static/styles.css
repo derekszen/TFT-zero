@@ -23,7 +23,7 @@ body {
 }
 
 body {
-  overflow: hidden;
+  overflow: auto;
   background:
     radial-gradient(circle at 50% 38%, rgba(236, 214, 132, 0.22), transparent 28%),
     linear-gradient(130deg, #213e30 0%, #0d1c22 42%, #231b28 100%);
@@ -55,11 +55,11 @@ button:disabled {
 .app-shell {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(138px, 10vw) minmax(0, 1fr) minmax(150px, 11vw);
-  grid-template-rows: minmax(0, 1fr) 182px;
-  width: 100vw;
-  height: 100vh;
-  min-width: 960px;
+  grid-template-columns: minmax(132px, 10rem) minmax(0, 1fr) minmax(156px, 12rem);
+  grid-template-rows: minmax(0, 1fr) auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 100vh;
 }
 
 .traits-panel,
@@ -145,20 +145,22 @@ button:disabled {
 
 .playfield {
   position: relative;
+  display: grid;
   grid-column: 2;
   grid-row: 1;
-  overflow: hidden;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: min(720px, calc(100vh - 178px));
+  overflow: clip;
 }
 
 .top-hud {
-  position: absolute;
+  position: relative;
   z-index: 3;
-  top: 14px;
-  left: 50%;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
-  transform: translateX(-50%);
+  padding: 14px 16px 8px;
 }
 
 .stage-pill,
@@ -190,11 +192,11 @@ button:disabled {
 }
 
 .arena {
-  position: absolute;
-  inset: 0;
+  position: relative;
   display: grid;
-  grid-template-rows: 112px minmax(300px, 1fr) 118px;
-  padding: 76px 44px 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+  padding: 10px 36px 12px;
   background:
     linear-gradient(90deg, rgba(0, 0, 0, 0.5), transparent 12%, transparent 88%, rgba(0, 0, 0, 0.55)),
     radial-gradient(ellipse at 50% 56%, rgba(227, 193, 107, 0.36), transparent 37%),
@@ -203,10 +205,10 @@ button:disabled {
 
 .arena::before {
   position: absolute;
-  inset: 62px 36px 118px;
+  inset: 104px 36px 124px;
   content: "";
   border: 18px solid rgba(92, 82, 65, 0.9);
-  border-radius: 6px;
+  border-radius: 8px;
   box-shadow:
     inset 0 0 0 2px rgba(255, 229, 149, 0.12),
     inset 0 0 54px rgba(0, 0, 0, 0.25),
@@ -215,15 +217,7 @@ button:disabled {
 }
 
 .arena::after {
-  position: absolute;
-  inset: 100px 98px 182px;
-  content: "";
-  opacity: 0.26;
-  background-image:
-    linear-gradient(30deg, transparent 46%, rgba(27, 125, 118, 0.9) 47%, rgba(27, 125, 118, 0.9) 53%, transparent 54%),
-    linear-gradient(150deg, transparent 46%, rgba(27, 125, 118, 0.9) 47%, rgba(27, 125, 118, 0.9) 53%, transparent 54%);
-  background-size: 78px 45px;
-  pointer-events: none;
+  display: none;
 }
 
 .enemy-lane {
@@ -231,6 +225,7 @@ button:disabled {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   gap: 8px;
+  min-height: 96px;
   place-items: end center;
 }
 
@@ -289,34 +284,42 @@ button:disabled {
   display: grid;
   place-items: center;
   min-height: 0;
+  padding: 8px 0;
   overflow: visible;
 }
 
 .board-grid {
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(3, minmax(112px, 150px));
-  grid-template-rows: repeat(3, minmax(86px, 108px));
-  gap: 12px 26px;
-  width: min(560px, 60vw);
+  grid-template-columns: repeat(3, minmax(112px, 148px));
+  grid-template-rows: repeat(3, minmax(88px, 108px));
+  gap: 10px 16px;
+  width: min(500px, 100%);
   max-height: 100%;
+  justify-content: center;
+  align-content: center;
 }
 
 .hex-cell {
   position: relative;
   display: grid;
+  width: 100%;
+  aspect-ratio: 1.16;
   place-items: center;
-  min-height: 86px;
+  min-height: 88px;
   overflow: visible;
 }
 
 .hex-cell::before {
   position: absolute;
-  inset: 5px 0;
+  inset: 2px;
   content: "";
   border: 2px solid rgba(35, 168, 158, 0.46);
-  background: rgba(47, 137, 112, 0.16);
+  background: rgba(31, 90, 77, 0.36);
   clip-path: polygon(14% 0, 86% 0, 100% 50%, 86% 100%, 14% 100%, 0 50%);
+  box-shadow:
+    inset 0 0 18px rgba(80, 211, 178, 0.14),
+    0 8px 20px rgba(0, 0, 0, 0.16);
   pointer-events: none;
 }
 
@@ -352,7 +355,7 @@ button:disabled {
 .hex-cell:nth-child(2),
 .hex-cell:nth-child(5),
 .hex-cell:nth-child(8) {
-  transform: translateY(14px);
+  transform: none;
 }
 
 .bench-dock {
@@ -361,7 +364,8 @@ button:disabled {
   grid-template-rows: 20px minmax(0, 1fr);
   gap: 7px;
   align-self: end;
-  padding: 0 12px 10px;
+  min-height: 104px;
+  padding: 8px 0 0;
   border-top: 1px solid rgba(214, 174, 83, 0.28);
   background: linear-gradient(180deg, rgba(5, 11, 13, 0.06), rgba(5, 11, 13, 0.42));
 }
@@ -376,15 +380,19 @@ button:disabled {
 
 .bench-row {
   display: grid;
-  grid-template-columns: repeat(9, minmax(54px, 1fr));
+  grid-template-columns: repeat(9, minmax(64px, 1fr));
   gap: 8px;
   align-items: center;
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 4px;
 }
 
 .bench-slot {
   position: relative;
-  height: 74px;
-  min-height: 74px;
+  height: 68px;
+  min-height: 68px;
   padding: 0;
   overflow: visible;
   background: rgba(18, 27, 28, 0.9);
@@ -465,10 +473,10 @@ button:disabled {
   grid-column: 1 / 4;
   grid-row: 2;
   display: grid;
-  grid-template-columns: 218px 128px minmax(0, 1fr) 290px;
-  gap: 14px;
-  align-items: center;
-  padding: 10px 18px;
+  grid-template-columns: minmax(180px, 220px) minmax(118px, 140px) minmax(420px, 1fr) minmax(250px, 300px);
+  gap: 12px;
+  align-items: stretch;
+  padding: 10px 14px;
   border-top: 1px solid var(--line);
 }
 
@@ -476,7 +484,7 @@ button:disabled {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  height: 154px;
+  height: auto;
 }
 
 .level-box {
@@ -509,7 +517,7 @@ button:disabled {
   display: grid;
   grid-template-rows: 1fr 1fr;
   gap: 8px;
-  height: 154px;
+  height: auto;
 }
 
 .gold-bank {
@@ -549,7 +557,7 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(5, minmax(126px, 1fr));
   gap: 10px;
-  height: 154px;
+  height: auto;
   min-width: 0;
 }
 
@@ -558,8 +566,8 @@ button:disabled {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   min-width: 0;
-  height: 154px;
-  min-height: 154px;
+  height: 138px;
+  min-height: 138px;
   padding: 0;
   overflow: hidden;
   text-align: left;
@@ -571,15 +579,15 @@ button:disabled {
 }
 
 .shop-art {
-  height: 96px;
-  min-height: 96px;
+  height: 82px;
+  min-height: 82px;
   background: linear-gradient(135deg, rgba(74, 83, 91, 0.7), rgba(20, 30, 35, 0.9));
 }
 
 .shop-art img {
   width: 100%;
   height: 100%;
-  min-height: 96px;
+  min-height: 82px;
   object-fit: cover;
   filter: saturate(1.05) contrast(1.08);
 }
@@ -621,7 +629,7 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
-  height: 154px;
+  height: auto;
 }
 
 .action-panel button {
@@ -643,13 +651,14 @@ button:disabled {
   position: absolute;
   z-index: 3;
   right: 12px;
-  top: 332px;
-  bottom: auto;
+  top: auto;
+  bottom: 164px;
   left: auto;
   display: grid;
   grid-template-columns: 1fr;
-  width: min(188px, calc(11vw - 24px));
+  width: min(188px, calc(12rem - 24px));
   height: auto;
+  max-height: 178px;
   gap: 8px;
   align-items: stretch;
   padding: 10px;
@@ -817,9 +826,143 @@ button:disabled {
   border-color: rgba(229, 165, 57, 0.95);
 }
 
+@media (min-width: 1101px) and (max-height: 820px) {
+  button {
+    min-height: 36px;
+  }
+
+  .playfield {
+    min-height: calc(100vh - 140px);
+  }
+
+  .top-hud {
+    padding: 10px 12px 6px;
+  }
+
+  .stage-pill,
+  .board-capacity {
+    min-height: 38px;
+    gap: 12px;
+    padding: 0 16px;
+  }
+
+  .timer-ring {
+    width: 46px;
+    height: 46px;
+    font-size: 16px;
+  }
+
+  .arena {
+    padding: 6px 32px 8px;
+  }
+
+  .arena::before {
+    inset: 84px 32px 102px;
+    border-width: 14px;
+  }
+
+  .enemy-lane {
+    min-height: 74px;
+    gap: 6px;
+  }
+
+  .enemy-squad {
+    min-height: 42px;
+  }
+
+  .enemy-token {
+    width: 46px;
+    font-size: 10px;
+  }
+
+  .enemy-orb {
+    width: 30px;
+    height: 30px;
+  }
+
+  .enemy-gate {
+    padding: 7px 14px;
+    font-size: 12px;
+  }
+
+  .board-grid {
+    grid-template-columns: repeat(3, minmax(96px, 128px));
+    grid-template-rows: repeat(3, minmax(72px, 86px));
+    width: min(432px, 100%);
+    gap: 8px 12px;
+  }
+
+  .hex-cell {
+    min-height: 72px;
+  }
+
+  .bench-dock {
+    grid-template-rows: 16px minmax(0, 1fr);
+    gap: 5px;
+    min-height: 86px;
+    padding-top: 6px;
+  }
+
+  .bench-slot {
+    height: 56px;
+    min-height: 56px;
+  }
+
+  .bottom-bar {
+    grid-template-columns: minmax(160px, 205px) minmax(110px, 130px) minmax(390px, 1fr) minmax(235px, 285px);
+    gap: 10px;
+    padding: 8px 14px;
+  }
+
+  .level-box {
+    min-height: 38px;
+  }
+
+  .level-box span {
+    font-size: 20px;
+  }
+
+  .gold-bank {
+    font-size: 24px;
+  }
+
+  .shop-card {
+    height: 122px;
+    min-height: 122px;
+  }
+
+  .shop-row {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .shop-art,
+  .shop-art img {
+    height: 70px;
+    min-height: 70px;
+  }
+
+  .shop-meta {
+    padding: 5px 8px;
+  }
+
+  .unit-name {
+    font-size: 14px;
+  }
+
+  .action-panel button {
+    min-height: 30px;
+  }
+
+  .trace-panel {
+    bottom: 140px;
+  }
+}
+
 @media (max-width: 1100px) {
+  html,
   body {
     overflow: auto;
+    overflow-x: hidden;
   }
 
   .app-shell {
@@ -827,7 +970,7 @@ button:disabled {
     min-height: 100vh;
     height: auto;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(520px, 60vh) auto auto auto auto;
+    grid-template-rows: auto auto auto auto auto;
   }
 
   .traits-panel {
@@ -841,6 +984,8 @@ button:disabled {
   .playfield {
     grid-column: 1;
     grid-row: 1;
+    min-height: 0;
+    overflow: visible;
   }
 
   .lobby-panel {
@@ -855,6 +1000,7 @@ button:disabled {
     grid-row: 2;
     grid-template-columns: 1fr;
     height: auto;
+    padding: 10px;
   }
 
   .economy-panel,
@@ -873,36 +1019,47 @@ button:disabled {
     grid-column: 1;
     grid-row: 5;
     grid-template-columns: 1fr;
+    width: auto;
     height: auto;
+    max-height: none;
     border-radius: 0;
   }
 
   .arena {
-    padding: 70px 14px 0;
+    padding: 10px 14px 12px;
   }
 
   .arena::before {
-    inset: 62px 14px 108px;
-    border-width: 14px;
-  }
-
-  .arena::after {
-    inset: 100px 28px 154px;
+    inset: 104px 14px 124px;
+    border-width: 10px;
   }
 
   .board-grid {
-    grid-template-columns: repeat(3, minmax(60px, 1fr));
-    width: min(330px, 84vw);
+    grid-template-columns: repeat(3, minmax(64px, 1fr));
+    grid-template-rows: repeat(3, minmax(66px, 78px));
+    width: min(312px, 100%);
+    gap: 6px;
+  }
+
+  .hex-cell {
+    min-height: 66px;
   }
 
   .bench-row {
-    grid-template-columns: repeat(3, minmax(64px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow-x: visible;
     padding-bottom: 8px;
   }
 
+  .bench-slot {
+    height: 72px;
+    min-height: 72px;
+  }
+
   .top-hud {
-    top: 8px;
+    flex-wrap: wrap;
     gap: 6px;
+    padding: 10px 8px 8px;
   }
 
   .stage-pill,
