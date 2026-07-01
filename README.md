@@ -267,6 +267,7 @@ MuZero-readiness, MCTS, and gate tools:
 
 ```text
 src/mini_tft/tools/generate_strategic_muzero_cache.py
+src/mini_tft/tools/checkpoint_guided_mcts_smoke.py
 src/mini_tft/tools/train_strategic_muzero_smoke.py
 src/mini_tft/tools/strategic_muzero_loop.py
 src/mini_tft/tools/strategic_muzero_run_loop.py
