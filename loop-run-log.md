@@ -233,3 +233,25 @@ Next action: Start `feat/puffer-material-speedup` from the updated runbook.
 - Verifier verdict: REJECT from first read-only verifier pass.
 - Next action: rerun focused checks, sync packet/code, and rerun read-only
   verifier.
+
+## 2026-07-01T09:01:14+08:00 - strategic_muzero_goal2_checkpoint_guided_mcts - launch attempt 1
+
+- Action: queued `tft-zero-checkpoint-guided-mcts-20260701T010114Z` on
+  `dual4090` GPU 0 after verifier acceptance.
+- Validation: run failed immediately before cache completion with
+  `RuntimeError: checkpoint policy produced no legal probability mass`.
+- Verifier verdict: prior ACCEPT invalidated by runtime failure.
+- Next action: fix checkpoint value handling for empty legal masks, rerun local
+  and remote seed-5000 reproductions, then rerun verifier before requeueing.
+
+## 2026-07-01T09:03:38+08:00 - strategic_muzero_goal2_checkpoint_guided_mcts - empty-mask fix
+
+- Action: changed checkpoint value evaluation to allow empty legal masks on the
+  value-only path while preserving strict legal probability checks for policy
+  priors.
+- Validation: focused checkpoint tests passed; seed-5000 local reproduction
+  passed `15/15`; seed-5000 remote reproduction passed `15/15`; focused suite,
+  Pyright, and `git diff --check` passed.
+- Verifier verdict: pending rerun after runtime fix.
+- Next action: refresh packet metadata, rerun read-only verifier, and requeue
+  only if accepted.
