@@ -255,3 +255,15 @@ Next action: Start `feat/puffer-material-speedup` from the updated runbook.
 - Verifier verdict: pending rerun after runtime fix.
 - Next action: refresh packet metadata, rerun read-only verifier, and requeue
   only if accepted.
+
+## 2026-07-01T09:09:04+08:00 - strategic_muzero_goal2_checkpoint_guided_mcts - launch attempt 2
+
+- Action: queued `tft-zero-checkpoint-guided-mcts-20260701T010904Z` on
+  `dual4090` GPU 0 as attempt `2/3` after verifier acceptance.
+- Validation: `run-serious` reports the run as running; initial launch log
+  records the intended checkpoint-guided command.
+- Verifier verdict: ACCEPT before launch attempt `2/3`.
+- Next action: monitor
+  `/srv/runs/derek/20260701-090907-tft-zero-checkpoint-guided-mcts-20260701T010904Z`
+  and collect `artifacts/strategic_lane/checkpoint_guided_mcts_20260701T010904Z/`
+  when complete.
