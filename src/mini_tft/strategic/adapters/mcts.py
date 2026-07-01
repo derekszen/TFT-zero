@@ -257,8 +257,7 @@ class StrategicMCTSPlanner:
     def _value(self, state: StrategicState) -> float:
         if self.config.value_mode == "checkpoint":
             mask = legal_action_mask(state, self.simulator_config)
-            _, value = self._checkpoint_policy_value(state, mask)
-            return value
+            return self._checkpoint_value(state, mask)
         score = scenario_score(state, self.simulator_config)
         placement = placement_proxy(state, self.simulator_config)
         placement_score = (8.0 - float(placement)) / 7.0
@@ -310,3 +309,18 @@ class StrategicMCTSPlanner:
             raise RuntimeError("checkpoint prior has no legal probability mass")
         priors /= total
         return priors, float(value)
+
+    def _checkpoint_value(
+        self,
+        state: StrategicState,
+        mask: NDArray[np.bool_],
+    ) -> float:
+        if self.config.checkpoint_evaluator is None:
+            raise RuntimeError("checkpoint-guided MCTS requires checkpoint_evaluator")
+        priors, value = self.config.checkpoint_evaluator(state, mask, self.simulator_config)
+        priors = np.asarray(priors, dtype=np.float32)
+        if priors.shape != mask.shape:
+            raise RuntimeError("checkpoint prior shape does not match legal action mask")
+        if not np.isfinite(float(value)):
+            raise RuntimeError("checkpoint value is non-finite")
+        return float(value)

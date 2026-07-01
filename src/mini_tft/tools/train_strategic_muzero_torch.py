@@ -334,6 +334,9 @@ def load_torch_muzero_policy_value(
             hidden = model.representation(obs)
             logits = model.policy_head(hidden).squeeze(0)
             value = float(model.value_head(hidden).squeeze().detach().cpu().item())
+            if not bool(mask_tensor.any()):
+                empty_priors = np.zeros(mask.shape, dtype=np.float32)
+                return empty_priors, value
             logits = logits.masked_fill(~mask_tensor, -1.0e9)
             priors = torch.softmax(logits, dim=-1)
             priors = priors.masked_fill(~mask_tensor, 0.0)

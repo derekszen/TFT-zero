@@ -36,6 +36,20 @@ def test_checkpoint_policy_value_masks_illegal_actions(tmp_path) -> None:
     assert value == pytest.approx(float(value))
 
 
+def test_checkpoint_policy_value_allows_empty_mask_for_value_only(tmp_path) -> None:
+    checkpoint = _tiny_checkpoint(tmp_path)
+    evaluator = load_torch_muzero_policy_value(checkpoint, device="cpu")
+    state = reset(seed=5)
+    mask = legal_action_mask(state)
+    empty_mask = mask & False
+
+    priors, value = evaluator(state, empty_mask, StrategicConfig())
+
+    assert priors.shape == mask.shape
+    assert float(priors.sum()) == pytest.approx(0.0)
+    assert value == pytest.approx(float(value))
+
+
 def test_checkpoint_guided_mcts_records_checkpoint_metadata(tmp_path) -> None:
     checkpoint = _tiny_checkpoint(tmp_path)
     evaluator = load_torch_muzero_policy_value(checkpoint, device="cpu")
