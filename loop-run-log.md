@@ -184,3 +184,17 @@ Next action: Start `feat/puffer-material-speedup` from the updated runbook.
   the implementation/rerun goal before completion.
 - Next action: run the goal prompt from
   `docs/CANDIDATE_CHOICE_MUZERO_RUNBOOK.md`.
+
+## 2026-07-01T08:08:00+08:00 - strategic_muzero_v0_dual4090_overnight_packet - attempt 2/3
+
+- Action: addressed the final verifier rejection for the prepared-paused
+  `dual4090` cache-supervised MuZero-style V0 packet by refreshing packet HEAD
+  metadata, adding packet-local loop state/log/final report artifacts, and
+  preserving the explicit allowance launch guard.
+- Validation: focused runner/judge tests, Ruff, `git diff --check`, packet JSON
+  parse, shell syntax checks, launch-guard negative checks, remote hash match,
+  and remote smoke evidence are being rerun/verified before final handoff.
+- Verifier verdict: pending final read-only verifier rerun after this retry.
+- Next action: pause unless the final verifier accepts; after acceptance, wait
+  for a real `/status` or usage-dashboard allowance check, or an explicit user
+  waiver, before launching the long run.

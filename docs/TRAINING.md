@@ -107,6 +107,28 @@ artifact contract and replace only the train-smoke stage.
 The cache path should write auditable observations, masks, actions, rewards,
 next observations, dones, policy targets, value targets, and metadata.
 
+Run the overnight strategic trainer wrapper with:
+
+```bash
+env -u UV_PYTHON uv run --extra train python -m mini_tft.tools.run_strategic_muzero_overnight \
+  --out-dir artifacts/strategic_lane/muzero_overnight_smoke \
+  --seed 3000 \
+  --cache-rows 2048 \
+  --mcts-simulations 32 \
+  --train-epochs 16 \
+  --device auto \
+  --codex-allowance-source unknown \
+  --strict
+```
+
+This wrapper is the long-run surface for the strategic lane. It runs parity,
+tiny cache/train preflight, baseline evaluation, cache validation, Torch
+policy/value/dynamics training, trained-policy evaluation, and the existing
+queue-ready verifier. It writes incremental `heartbeat.jsonl`, `loop-state.json`,
+and `loop-run-log.md` artifacts from startup so a failed overnight run still has
+evidence. Label the result `smoke_only` unless model-backed search/reanalysis
+and the quality gate prove a stronger claim.
+
 ## Baseline Discipline
 
 Every training artifact should name:

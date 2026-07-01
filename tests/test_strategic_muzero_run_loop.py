@@ -29,6 +29,8 @@ def test_strategic_muzero_run_loop_runs_full_programmatic_gate(tmp_path) -> None
             baseline_episodes=2,
             parity_seeds=(0,),
             parity_scenarios=("reset_only",),
+            judge_packet_name="strategic-muzero-run-loop-test",
+            judge_out_root=tmp_path / "judge",
         )
     )
 
@@ -50,15 +52,28 @@ def test_strategic_muzero_run_loop_runs_full_programmatic_gate(tmp_path) -> None
     )
     assert metrics["metrics"]["cache"]["rows"] == 16
     assert metrics["metrics"]["baselines"]["policies"] == ["heuristic", "random"]
+    assert metrics["metrics"]["claim_scope"]["name"] == "cache_supervised_muzero_style_v0"
+    assert metrics["metrics"]["antigravity_judge"]["status"] == "pending_verdict"
+    assert metrics["metrics"]["antigravity_judge"]["preferred_model"] == "gemini-3.5-flash-low"
+    assert (
+        metrics["metrics"]["antigravity_judge"]["packet"]["out_dir"]
+        == str(tmp_path / "judge" / "strategic-muzero-run-loop-test")
+    )
+    assert "antigravity_ai_router_command.txt" in (
+        metrics["metrics"]["antigravity_judge"]["packet"]["artifacts"]
+    )
     assert state["blocked_condition"]
     assert state["pause_criteria"]
     assert state["kill_criteria"]
-    assert state["codex_allowance_check"]["source"] == "user"
-    assert state["codex_allowance_check"]["weekly_usage"] == "ample"
-    assert state["codex_allowance_check"]["decision"] == "continue"
-    assert gate_state["codex_allowance_check"]["source"] == "user"
-    assert gate_state["codex_allowance_check"]["weekly_usage"] == "ample"
-    assert gate_state["codex_allowance_check"]["decision"] == "continue"
+    assert state["config"]["automation_level"] == "L1"
+    assert state["config"]["wall_clock_limit_minutes"] == 360
+    assert state["codex_allowance_check"]["source"] == "unknown"
+    assert state["codex_allowance_check"]["weekly_usage"] == "unknown"
+    assert state["codex_allowance_check"]["decision"] == "soft-pause"
+    assert gate_state["codex_allowance_check"]["source"] == "unknown"
+    assert gate_state["codex_allowance_check"]["weekly_usage"] == "unknown"
+    assert gate_state["codex_allowance_check"]["decision"] == "soft-pause"
+    assert "provide Codex allowance status" in state["current_next_action"]
     assert (tmp_path / "parity_matrix" / "metrics.json").exists()
     assert (tmp_path / "policy_eval" / "metrics.json").exists()
     assert (tmp_path / "cache" / "rows.jsonl").exists()
@@ -68,3 +83,68 @@ def test_strategic_muzero_run_loop_runs_full_programmatic_gate(tmp_path) -> None
     assert (tmp_path / "verifier" / "decision.md").exists()
     assert (tmp_path / "loop-state.json").exists()
     assert (tmp_path / "loop-run-log.md").exists()
+    assert (tmp_path / "overnight_goal.md").exists()
+    assert (tmp_path / "judge" / "strategic-muzero-run-loop-test" / "prompt.md").exists()
+
+
+def test_strategic_muzero_run_loop_blocks_after_attempt_cap(tmp_path) -> None:
+    if shutil.which("cc") is None:
+        pytest.skip("C compiler is not available")
+
+    config = StrategicMuZeroRunLoopConfig(
+        out_dir=tmp_path,
+        seed=23,
+        attempt_cap=1,
+        cache_episodes=2,
+        cache_rows=16,
+        mcts_simulations=4,
+        mcts_max_depth=4,
+        mcts_rollout_steps=2,
+        train_epochs=3,
+        train_learning_rate=0.02,
+        baseline_episodes=2,
+        parity_seeds=(0,),
+        parity_scenarios=("reset_only",),
+    )
+
+    first = run_strategic_muzero_run_loop(config)
+    second = run_strategic_muzero_run_loop(config)
+
+    metrics = json.loads((tmp_path / "metrics.json").read_text(encoding="utf-8"))
+    state = json.loads((tmp_path / "loop-state.json").read_text(encoding="utf-8"))
+    attempt_guard = metrics["metrics"]["attempt_guard"]
+
+    assert first["status"] == "pass"
+    assert second["status"] == "blocked"
+    assert attempt_guard["attempt"] == 2
+    assert attempt_guard["attempt_cap"] == 1
+    assert attempt_guard["exceeded"] is True
+    assert state["status"] == "blocked"
+    assert state["attempt"] == 2
+    assert "attempt cap exceeded" in state["current_next_action"]
+
+
+def test_strategic_muzero_run_loop_rejects_unknown_allowance_continue(tmp_path) -> None:
+    with pytest.raises(ValueError, match="unknown codex allowance source cannot use continue"):
+        run_strategic_muzero_run_loop(
+            StrategicMuZeroRunLoopConfig(
+                out_dir=tmp_path,
+                codex_allowance_source="unknown",
+                codex_allowance_decision="continue",
+            )
+        )
+
+
+def test_strategic_muzero_run_loop_rejects_placeholder_allowance_continue(
+    tmp_path,
+) -> None:
+    with pytest.raises(ValueError, match="real allowance value"):
+        run_strategic_muzero_run_loop(
+            StrategicMuZeroRunLoopConfig(
+                out_dir=tmp_path,
+                codex_allowance_source="/status",
+                codex_five_hour_window_remaining="<fill-from-status-or-waiver>",
+                codex_weekly_usage="status-check-placeholder",
+                codex_allowance_decision="continue",
+            )
+        )

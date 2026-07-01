@@ -5,6 +5,8 @@ from mini_tft.strategic.adapters.baselines.policies import (
     first_legal_policy,
     random_policy,
     tft_heuristic_policy,
+    weakest_legal_policy,
+    worst_first_policy,
 )
 
 __all__ = [
@@ -12,4 +14,6 @@ __all__ = [
     "first_legal_policy",
     "random_policy",
     "tft_heuristic_policy",
+    "weakest_legal_policy",
+    "worst_first_policy",
 ]

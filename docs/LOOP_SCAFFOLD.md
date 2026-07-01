@@ -103,9 +103,10 @@ Verifier output is fail-closed:
 
 For external model verification, use the user-approved verifier for the task.
 Current preferred verifier for long loops is the reusable Antigravity judge
-packet in `docs/ANTIGRAVITY_JUDGE.md`, using Flash 3.5 with high thinking in
-read-only mode. If Antigravity is unavailable, record the missing verifier and
-keep the gate blocked unless the user explicitly approves a fallback.
+packet in `docs/ANTIGRAVITY_JUDGE.md`, using local ai-router Antigravity with
+the live `gemini-3.5-flash-low` alias and highest thinking in read-only mode. If ai-router
+Antigravity is unavailable, record the missing verifier and keep the gate
+blocked unless the user explicitly approves a fallback.
 
 ## Done Means
 

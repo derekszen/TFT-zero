@@ -1,17 +1,23 @@
 # Antigravity Judge
 
 Use this packet when a deliverable needs an independent read-only judge before
-promotion or loop completion.
+promotion or loop completion. On this machine, Antigravity is reached through
+the local ai-router / CLIProxyAPI OpenAI-compatible endpoint, not through a
+standalone `antigravity` CLI.
 
 ## Contract
 
-- Preferred runner: Antigravity IDE/manual review.
-- Preferred judge model: Flash 3.5.
-- Thinking: high.
+- Preferred runner: Antigravity via ai-router.
+- Preferred judge model: `gemini-3.5-flash-low`, the live Antigravity alias on
+  this machine.
+- Thinking: highest / `reasoning_effort=xhigh` where the router/model supports
+  it.
 - Mode: read-only. The judge may inspect code, docs, validation output, and
   listed artifacts, but must not edit files or mutate external systems.
 - Gate behavior: fail closed. Missing, malformed, or `REJECT` verdicts block
   completion until fixed or explicitly overridden by the user.
+- Provider path:
+  `client -> http://127.0.0.1:8317/v1 -> CLIProxyAPI -> Antigravity OAuth`.
 
 The judge output must use exactly this schema:
 
@@ -46,21 +52,48 @@ The packet contains:
 - `prompt.md`: instructions to paste/open in Antigravity.
 - `evidence_manifest.json`: machine-readable scope and evidence list.
 - `verdict_template.md`: default fail-closed verdict shape.
-- `gemini_fallback_command.txt`: optional fallback command shape.
+- `antigravity_ai_router_command.txt`: read-only command that calls ai-router
+  and writes `verdict.md`.
 - `decision.md`: current gate state, blocked until strict `ACCEPT`.
 - `metrics.json`: packet metadata.
 
-## Run In Antigravity
+## Run With ai-router Antigravity
 
-1. Open the worktree in Antigravity.
-2. Select Flash 3.5 and set thinking to high.
-3. Keep the session read-only.
-4. Open `artifacts/judge/<name>/prompt.md` and the listed evidence files.
-5. Save the judge response to `artifacts/judge/<name>/verdict.md`.
+1. Confirm ai-router Antigravity auth is available:
 
-Accept only if the output starts with `Verdict: ACCEPT` and includes non-empty
-`Evidence checked`, `Findings`, and `Suggested action` sections. Otherwise the
-gate remains blocked.
+   ```bash
+   cd /mnt/ssd2/Projects/ai-router
+   bin/select-auth current antigravity
+   ```
+
+2. If login is missing or expired, refresh OAuth:
+
+   ```bash
+   cd /mnt/ssd2/Projects/ai-router
+   bin/login-antigravity
+   ```
+
+3. If needed, switch accounts:
+
+   ```bash
+   cd /mnt/ssd2/Projects/ai-router
+   bin/select-auth list antigravity
+   bin/select-auth use antigravity derek --restart
+   ```
+
+4. Run the generated command:
+
+   ```bash
+   bash artifacts/judge/<name>/antigravity_ai_router_command.txt
+   ```
+
+The command evaluates `bin/ai-env antigravity`, overrides
+`MODEL=gemini-3.5-flash-low`, writes `artifacts/judge/<name>/verdict.md`, and then
+runs the strict verdict checker.
+
+Accept only if the output starts directly with `Verdict: ACCEPT`, with no
+Markdown code fence or wrapper text, and includes non-empty `Evidence checked`,
+`Findings`, and `Suggested action` sections. Otherwise the gate remains blocked.
 
 ## Check The Verdict
 
@@ -74,26 +107,13 @@ env -u UV_PYTHON uv run python -m mini_tft.tools.judge_packet \
 The checker exits nonzero unless the verdict file is well-formed and says
 `Verdict: ACCEPT`.
 
-## CLI Availability
+## Smoke Test
 
-This repo does not assume an Antigravity CLI. If `antigravity` is unavailable on
-`PATH`, use Antigravity as an external IDE/manual runner and keep the local gate
-blocked until `verdict.md` is supplied.
-
-The Gemini CLI fallback is optional. In this environment, `gemini --help`
-verified the read-only `--approval-mode plan`, `--model`, `--prompt`, and
-`--output-format` options. Model access and the exact local model id remain
-account/config dependent.
-
-Fallback shape:
+Judge packets use the live `gemini-3.5-flash-low` Antigravity alias and still
+request highest available reasoning. A quick router smoke test is:
 
 ```bash
-gemini --approval-mode plan \
-  --model gemini-3.5-flash \
-  --output-format text \
-  --prompt "Run this read-only MiniTFT judge packet. Return only the strict schema." \
-  < artifacts/judge/<name>/prompt.md
+cd /mnt/ssd2/Projects/ai-router
+eval "$(bin/ai-env antigravity)"
+MODEL=gemini-3.5-flash-low bin/test-chat
 ```
-
-If your Gemini CLI names Flash 3.5 differently, replace only the model id. Keep
-`--approval-mode plan` and do not use auto-edit or yolo modes for judge work.
