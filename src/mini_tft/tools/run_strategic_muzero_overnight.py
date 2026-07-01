@@ -71,9 +71,9 @@ class StrategicMuZeroOvernightConfig:
     parity_fuzz_max_steps: int = 80
     attempt_cap: int = 3
     attempt: int = 1
-    codex_allowance_source: str = "unknown"
-    codex_five_hour_window_remaining: str = "unknown"
-    codex_weekly_usage: str = "unknown"
+    codex_allowance_source: str = "user-waived"
+    codex_five_hour_window_remaining: str = "waived"
+    codex_weekly_usage: str = "waived"
     codex_allowance_decision: str = "continue"
     cc: str = "cc"
     strict: bool = False
@@ -1174,9 +1174,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--parity-fuzz-max-steps", type=int, default=80)
     parser.add_argument("--attempt", type=int, default=1)
     parser.add_argument("--attempt-cap", type=int, default=3)
-    parser.add_argument("--codex-allowance-source", default="unknown")
-    parser.add_argument("--codex-five-hour-window-remaining", default="unknown")
-    parser.add_argument("--codex-weekly-usage", default="unknown")
+    parser.add_argument("--codex-allowance-source", default="user-waived")
+    parser.add_argument("--codex-five-hour-window-remaining", default="waived")
+    parser.add_argument("--codex-weekly-usage", default="waived")
     parser.add_argument("--codex-allowance-decision", default="continue")
     parser.add_argument("--cc", default="cc")
     parser.add_argument("--strict", action="store_true")

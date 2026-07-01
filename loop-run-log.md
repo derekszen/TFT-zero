@@ -198,3 +198,15 @@ Next action: Start `feat/puffer-material-speedup` from the updated runbook.
 - Next action: pause unless the final verifier accepts; after acceptance, wait
   for a real `/status` or usage-dashboard allowance check, or an explicit user
   waiver, before launching the long run.
+
+## 2026-07-01T08:19:42+08:00 - strategic_muzero_v0_dual4090_overnight_packet - waiver update
+
+- Action: removed Codex allowance as a launch requirement after explicit user
+  waiver, updated the V0 loop and overnight wrapper defaults to record
+  `user-waived` launch metadata, and changed the packet from
+  `prepared_paused` to `prepared_ready`.
+- Validation: focused runner/overnight tests, Ruff, packet JSON/shell checks,
+  remote sync, and read-only verifier rerun are pending after this update.
+- Verifier verdict: pending.
+- Next action: queue the prepared long run when ready; stop on failed quality
+  gate, attempt cap, remote readiness failure, or post-run judge rejection.

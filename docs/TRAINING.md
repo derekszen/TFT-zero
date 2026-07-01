@@ -117,7 +117,7 @@ env -u UV_PYTHON uv run --extra train python -m mini_tft.tools.run_strategic_muz
   --mcts-simulations 32 \
   --train-epochs 16 \
   --device auto \
-  --codex-allowance-source unknown \
+  --codex-allowance-source user-waived \
   --strict
 ```
 

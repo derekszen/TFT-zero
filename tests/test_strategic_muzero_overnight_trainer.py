@@ -94,7 +94,6 @@ def test_overnight_wrapper_writes_incremental_loop_artifacts(tmp_path) -> None:
             preflight_episodes=2,
             parity_seeds=(0,),
             parity_scenarios=("reset_only",),
-            codex_allowance_source="unknown",
             codex_allowance_decision="continue",
         )
     )
@@ -123,8 +122,8 @@ def test_overnight_wrapper_writes_incremental_loop_artifacts(tmp_path) -> None:
     assert any(row["stage"] == "torch_training" for row in heartbeat_rows)
     assert loop_state["current_stage"] == "final_report"
     assert loop_state["attempt"] == 1
-    assert loop_state["codex_allowance_check"]["source"] == "unknown"
-    assert metrics["config"]["codex_allowance_check"]["source"] == "unknown"
+    assert loop_state["codex_allowance_check"]["source"] == "user-waived"
+    assert metrics["config"]["codex_allowance_check"]["source"] == "user-waived"
     assert metrics["validation"]["failed"] is False
     assert "cache_generation" in loop_log
     assert "Codex allowance" in loop_log

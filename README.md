@@ -123,18 +123,18 @@ mini_tft.tools.strategic_muzero_loop
 
 ## Remote Overnight Packet
 
-A remote `dual4090` packet is prepared for a larger cache-supervised V0 run, but
-it is paused, not queued:
+A remote `dual4090` packet is prepared for a larger cache-supervised V0 run. It
+is not queued yet, but the Codex allowance pause has been waived by the user:
 
 ```text
 artifacts/strategic_lane/muzero_v0_dual4090_overnight_packet/
 ```
 
 The packet records the remote project path, run command, local post-run judge
-command, remote smoke status, and file hashes. Launch requires a real `/status`
-or Codex usage-dashboard allowance check, or an explicit user waiver.
-Antigravity verdicting remains local through the workstation ai-router after
-remote artifacts are collected.
+command, remote smoke status, and file hashes. Launch is still gated by the
+programmatic verifier, attempt cap, remote readiness, and local Antigravity
+verdicting after remote artifacts are collected; it no longer requires a Codex
+allowance check.
 
 ## Antigravity Judge
 

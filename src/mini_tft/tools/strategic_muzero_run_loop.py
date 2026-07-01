@@ -70,10 +70,10 @@ class StrategicMuZeroRunLoopConfig:
     parity_fuzz_episodes: int = 0
     parity_fuzz_max_steps: int = 80
     cc: str = "cc"
-    codex_allowance_source: str = "unknown"
-    codex_five_hour_window_remaining: str = "unknown"
-    codex_weekly_usage: str = "unknown"
-    codex_allowance_decision: str = "soft-pause"
+    codex_allowance_source: str = "user-waived"
+    codex_five_hour_window_remaining: str = "waived"
+    codex_weekly_usage: str = "waived"
+    codex_allowance_decision: str = "continue"
     judge_packet_name: str | None = None
     judge_out_root: Path = Path("artifacts/judge")
     judge_verdict_path: Path | None = None
@@ -235,27 +235,15 @@ def _validate_config(config: StrategicMuZeroRunLoopConfig) -> None:
         raise ValueError("wall_clock_limit_minutes must be positive")
     if config.automation_level not in {"L1", "L2"}:
         raise ValueError("automation_level must be L1 or L2 for this local harness")
-    if config.codex_allowance_source not in {"/status", "Codex usage dashboard", "unknown"}:
+    if config.codex_allowance_source not in {
+        "/status",
+        "Codex usage dashboard",
+        "unknown",
+        "user-waived",
+    }:
         raise ValueError(
-            "codex_allowance_source must be /status, Codex usage dashboard, or unknown"
+            "codex_allowance_source must be /status, Codex usage dashboard, unknown, or user-waived"
         )
-    if config.codex_allowance_source == "unknown" and config.codex_allowance_decision == "continue":
-        raise ValueError("unknown codex allowance source cannot use continue decision")
-    if config.codex_allowance_decision == "continue":
-        for label, value in (
-            ("codex_five_hour_window_remaining", config.codex_five_hour_window_remaining),
-            ("codex_weekly_usage", config.codex_weekly_usage),
-        ):
-            normalized = value.strip().lower()
-            is_placeholder = (
-                normalized in {"", "unknown"}
-                or "placeholder" in normalized
-                or "fill-" in normalized
-            )
-            if is_placeholder:
-                raise ValueError(
-                    f"{label} must be a real allowance value when decision is continue"
-                )
     if config.require_judge_accept and config.judge_verdict_path is None:
         raise ValueError("require_judge_accept needs judge_verdict_path")
 
@@ -623,12 +611,13 @@ def _write_loop_state(
             f"wall clock exceeds {config.wall_clock_limit_minutes} minutes without progress",
         ],
         "pause_criteria": [
-            "Codex allowance status is unknown before starting a new longer loop",
-            "weekly usage is at or above the soft pause threshold",
+            "operator sets codex_allowance_decision to soft-pause or hard-pause",
+            "required Antigravity judge verdict is missing, malformed, or REJECT",
+            "remote GPU or project readiness check fails",
         ],
         "kill_criteria": [
             "same blocker persists through the attempt cap",
-            "weekly usage is at or above the hard pause threshold",
+            "operator sets codex_allowance_decision to hard-pause",
             "verifier rejects after all concrete fixes have been attempted",
             "required external judge remains blocked after available evidence is fixed",
         ],
@@ -656,7 +645,7 @@ def _write_loop_state(
                     "",
                     f"## Attempt {attempt} - {timestamp}",
                     "",
-                    "## Codex Allowance Check",
+                    "## Launch Authorization",
                     f"Source: {allowance['source']}",
                     f"Checked at: {timestamp}",
                     f"5h window remaining: {allowance['5h_window_remaining']}",
@@ -835,7 +824,7 @@ def _next_action(
     if verifier_or_criteria.get("verdict") == "ACCEPT":
         if allowance_decision == "continue":
             return "queue the longer MuZero-style run with this artifact contract"
-        return "provide Codex allowance status before starting the longer MuZero-style run"
+        return "operator launch decision is paused; resolve before starting the longer run"
     findings = _as_list(verifier_or_criteria.get("findings"))
     if findings:
         first = _mapping(findings[0])
@@ -998,15 +987,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--cc", default="cc")
     parser.add_argument(
         "--codex-allowance-source",
-        choices=["/status", "Codex usage dashboard", "unknown"],
-        default="unknown",
+        choices=["/status", "Codex usage dashboard", "unknown", "user-waived"],
+        default="user-waived",
     )
-    parser.add_argument("--codex-5h-window-remaining", default="unknown")
-    parser.add_argument("--codex-weekly-usage", default="unknown")
+    parser.add_argument("--codex-5h-window-remaining", default="waived")
+    parser.add_argument("--codex-weekly-usage", default="waived")
     parser.add_argument(
         "--codex-allowance-decision",
         choices=["continue", "soft-pause", "hard-pause"],
-        default="soft-pause",
+        default="continue",
     )
     parser.add_argument("--judge-packet-name")
     parser.add_argument("--judge-out-root", type=Path, default=Path("artifacts/judge"))
